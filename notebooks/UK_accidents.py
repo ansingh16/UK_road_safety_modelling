@@ -143,3 +143,50 @@ class AccidentSeverityClassifier:
         print(pd.Series(self.y_train).value_counts().sort_index())
         
         return self.X_train, self.X_test, self.y_train, self.y_test
+    def apply_sampling_techniques(self):
+        """
+        Apply various sampling techniques to handle imbalanced data
+        """
+        if self.X_train is None:
+            print("Please preprocess data first!")
+            return
+        
+        print("="*50)
+        print("APPLYING SAMPLING TECHNIQUES")
+        print("="*50)
+        
+        sampling_techniques = {}
+        
+        # Original data
+        sampling_techniques['Original'] = (self.X_train, self.y_train)
+        
+        # SMOTE
+        smote = SMOTE(random_state=42)
+        X_smote, y_smote = smote.fit_resample(self.X_train, self.y_train)
+        sampling_techniques['SMOTE'] = (X_smote, y_smote)
+        
+        # ADASYN
+        try:
+            adasyn = ADASYN(random_state=42)
+            X_adasyn, y_adasyn = adasyn.fit_resample(self.X_train, self.y_train)
+            sampling_techniques['ADASYN'] = (X_adasyn, y_adasyn)
+        except:
+            print("ADASYN failed, skipping...")
+        
+        # SMOTE + Tomek
+        smote_tomek = SMOTETomek(random_state=42)
+        X_smote_tomek, y_smote_tomek = smote_tomek.fit_resample(self.X_train, self.y_train)
+        sampling_techniques['SMOTE+Tomek'] = (X_smote_tomek, y_smote_tomek)
+        
+        # Random Under Sampling (to balance severe cases)
+        rus = RandomUnderSampler(random_state=42, sampling_strategy={3: 10000, 2: 5000, 1: 1218})
+        X_rus, y_rus = rus.fit_resample(self.X_train, self.y_train)
+        sampling_techniques['Random Under Sampling'] = (X_rus, y_rus)
+        
+        # Display distributions
+        for name, (X_samp, y_samp) in sampling_techniques.items():
+            print(f"\n{name} distribution:")
+            print(pd.Series(y_samp).value_counts().sort_index())
+        
+        return sampling_techniques
+    
