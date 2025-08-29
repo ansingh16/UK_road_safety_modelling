@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
 import warnings
+import lightgbm as lgb
+
 warnings.filterwarnings('ignore')
 
 
@@ -189,4 +191,158 @@ class AccidentSeverityClassifier:
             print(pd.Series(y_samp).value_counts().sort_index())
         
         return sampling_techniques
+    
+    def train_models(self, sampling_techniques):
+        """
+        Train multiple models with different sampling techniques
+        Focus on two optimization strategies:
+        1. Maximum severe case recall
+        2. Best overall balance (macro recall)
+        """
+        print("="*50)
+        print("TRAINING MODELS - DUAL OPTIMIZATION STRATEGY")
+        print("="*50)
+        
+        # Define models with different optimization focuses
+        severe_optimized_models = {
+            'RF_SevereOptim': RandomForestClassifier(
+                n_estimators=100, 
+                max_depth=10,
+                class_weight={1: 50, 2: 5, 3: 1},  # Heavy weight for severe cases
+                random_state=42
+            ),
+            'LR_SevereOptim': LogisticRegression(
+                class_weight={1: 50, 2: 5, 3: 1},
+                random_state=42,
+                max_iter=1000
+            ),
+            'GB_SevereOptim': GradientBoostingClassifier(
+                n_estimators=100,
+                max_depth=6,
+                random_state=42
+            )
+        }
+        
+        balanced_models = {
+            'RF_Balanced': RandomForestClassifier(
+                n_estimators=100, 
+                max_depth=10,
+                class_weight='balanced',
+                random_state=42
+            ),
+            'LR_Balanced': LogisticRegression(
+                class_weight='balanced',
+                random_state=42,
+                max_iter=1000
+            ),
+            'BalancedRF': BalancedRandomForestClassifier(
+                n_estimators=100,
+                random_state=42
+            )
+        }
+        
+        
+        # Calculate class weights for LightGBM
+        class_counts = pd.Series(self.y_train).value_counts()
+        total_samples = len(self.y_train)
+            
+        balanced_models['LightGBM_Balanced'] = lgb.LGBMClassifier(
+                objective='multiclass',
+                num_class=3,
+                class_weight='balanced',
+                n_estimators=100,
+                random_state=42,
+                verbosity=-1
+            )
+            
+        severe_optimized_models['LightGBM_SevereOptim'] = lgb.LGBMClassifier(
+                objective='multiclass',
+                num_class=3,
+                class_weight={1: 50, 2: 5, 3: 1},
+                n_estimators=100,
+                random_state=42,
+                verbosity=-1
+            )
+        
+        all_models = {**severe_optimized_models, **balanced_models}
+        results = []
+        
+        for sampling_name, (X_samp, y_samp) in sampling_techniques.items():
+            print(f"\nTraining models with {sampling_name}...")
+            
+            # Scale the sampled data
+            if sampling_name == 'Original':
+                X_samp_scaled = self.X_train_scaled
+            else:
+                X_samp_scaled = self.scaler.fit_transform(X_samp)
+            
+            for model_name, model in all_models.items():
+                # Skip BalancedRandomForest for non-original data as it handles imbalance internally
+                if model_name == 'BalancedRF' and sampling_name != 'Original':
+                    continue
+                
+                try:
+                    # Train model
+                    if 'LR_' in model_name:
+                        model.fit(X_samp_scaled, y_samp)
+                        y_pred = model.predict(self.X_test_scaled)
+                        y_pred_proba = model.predict_proba(self.X_test_scaled)
+                    else:
+                        model.fit(X_samp, y_samp)
+                        y_pred = model.predict(self.X_test)
+                        y_pred_proba = model.predict_proba(self.X_test)
+                    
+                    # Calculate comprehensive metrics
+                    recall_severe = recall_score(self.y_test, y_pred, labels=[1], average='macro', zero_division=0)
+                    precision_severe = precision_score(self.y_test, y_pred, labels=[1], average='macro', zero_division=0)
+                    f1_severe = f1_score(self.y_test, y_pred, labels=[1], average='macro', zero_division=0)
+                    
+                    # Overall metrics
+                    recall_macro = recall_score(self.y_test, y_pred, average='macro')
+                    precision_macro = precision_score(self.y_test, y_pred, average='macro')
+                    f1_macro = f1_score(self.y_test, y_pred, average='macro')
+                    accuracy = accuracy_score(self.y_test, y_pred)
+                    
+                    # Per-class metrics
+                    recall_per_class = recall_score(self.y_test, y_pred, average=None)
+                    precision_per_class = precision_score(self.y_test, y_pred, average=None, zero_division=0)
+                    
+                    # Calculate severe case statistics from confusion matrix
+                    cm = confusion_matrix(self.y_test, y_pred, labels=[1, 2, 3])
+                    if cm.shape[0] > 0:  # Ensure severe cases exist in test set
+                        severe_true_pos = cm[0, 0] if cm.shape[0] > 0 else 0
+                        severe_false_pos = cm[1:, 0].sum() if cm.shape[0] > 0 else 0
+                        severe_precision_actual = severe_true_pos / (severe_true_pos + severe_false_pos) if (severe_true_pos + severe_false_pos) > 0 else 0
+                    else:
+                        severe_precision_actual = 0
+                    
+                    # Model type classification
+                    model_type = "Severe-Optimized" if "SevereOptim" in model_name else "Balanced"
+                    
+                    results.append({
+                        'Sampling': sampling_name,
+                        'Model': model_name,
+                        'Model_Type': model_type,
+                        'Recall_Severe': recall_severe,
+                        'Precision_Severe': precision_severe,
+                        'F1_Severe': f1_severe,
+                        'Severe_Precision_Actual': severe_precision_actual,
+                        'Recall_Macro': recall_macro,
+                        'Precision_Macro': precision_macro,
+                        'F1_Macro': f1_macro,
+                        'Accuracy': accuracy,
+                        'Recall_Class1': recall_per_class[0] if len(recall_per_class) > 0 else 0,
+                        'Recall_Class2': recall_per_class[1] if len(recall_per_class) > 1 else 0,
+                        'Recall_Class3': recall_per_class[2] if len(recall_per_class) > 2 else 0,
+                        'Model_Object': model,
+                        'Predictions': y_pred,
+                        'Probabilities': y_pred_proba,
+                        'Sampling_Data': (X_samp, y_samp)
+                    })
+                    
+                except Exception as e:
+                    print(f"Error training {model_name} with {sampling_name}: {e}")
+        
+        self.results_df = pd.DataFrame(results)
+        return self.results_df
     
