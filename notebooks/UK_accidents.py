@@ -346,3 +346,143 @@ class AccidentSeverityClassifier:
         self.results_df = pd.DataFrame(results)
         return self.results_df
     
+    def evaluate_models(self):
+        """
+        Evaluate models with dual strategy:
+        1. Best model for severe case recall
+        2. Best model for overall balance
+        """
+        if not hasattr(self, 'results_df'):
+            print("Please train models first!")
+            return
+        
+        print("="*70)
+        print("DUAL MODEL EVALUATION - SEVERE RECALL vs BALANCED PERFORMANCE")
+        print("="*70)
+        
+        # Strategy 1: Best for Severe Case Recall
+        severe_optimized = self.results_df.sort_values('Recall_Severe', ascending=False)
+        best_severe_idx = severe_optimized.index[0]
+        self.best_severe_model = severe_optimized.loc[best_severe_idx, 'Model_Object']
+        best_severe_pred = severe_optimized.loc[best_severe_idx, 'Predictions']
+        
+        print("STRATEGY 1: BEST FOR SEVERE CASE DETECTION")
+        print("-" * 50)
+        print(f"Model: {severe_optimized.loc[best_severe_idx, 'Model']} with {severe_optimized.loc[best_severe_idx, 'Sampling']}")
+        print(f"Severe Case Recall: {severe_optimized.loc[best_severe_idx, 'Recall_Severe']:.1%}")
+        print(f"Severe Case Precision: {severe_optimized.loc[best_severe_idx, 'Severe_Precision_Actual']:.1%}")
+        print(f"Overall Accuracy: {severe_optimized.loc[best_severe_idx, 'Accuracy']:.1%}")
+        
+        # Strategy 2: Best for Overall Balance (Macro Recall)
+        balanced_optimized = self.results_df.sort_values('Recall_Macro', ascending=False)
+        best_balanced_idx = balanced_optimized.index[0]
+        self.best_balanced_model = balanced_optimized.loc[best_balanced_idx, 'Model_Object']
+        best_balanced_pred = balanced_optimized.loc[best_balanced_idx, 'Predictions']
+        
+        print(f"\n STRATEGY 2: BEST FOR OVERALL BALANCE")
+        print("-" * 50)
+        print(f"Model: {balanced_optimized.loc[best_balanced_idx, 'Model']} with {balanced_optimized.loc[best_balanced_idx, 'Sampling']}")
+        print(f"Macro Recall: {balanced_optimized.loc[best_balanced_idx, 'Recall_Macro']:.1%}")
+        print(f"Severe Case Recall: {balanced_optimized.loc[best_balanced_idx, 'Recall_Severe']:.1%}")
+        print(f"Overall Accuracy: {balanced_optimized.loc[best_balanced_idx, 'Accuracy']:.1%}")
+        
+        # Top 5 models for each strategy
+        print(f"\n TOP 5 MODELS FOR SEVERE CASE DETECTION:")
+        severe_display_cols = ['Model', 'Sampling', 'Recall_Severe', 'Severe_Precision_Actual', 'Recall_Macro', 'Accuracy']
+        print(severe_optimized[severe_display_cols].head().round(3))
+        
+        print(f"\n TOP 5 MODELS FOR BALANCED PERFORMANCE:")
+        balanced_display_cols = ['Model', 'Sampling', 'Recall_Macro', 'Recall_Severe', 'F1_Macro', 'Accuracy']
+        print(balanced_optimized[balanced_display_cols].head().round(3))
+        
+        # Detailed comparison
+        self._detailed_model_comparison(best_severe_pred, best_balanced_pred, 
+                                      severe_optimized.iloc[0], balanced_optimized.iloc[0])
+        
+        return severe_optimized, balanced_optimized
+    
+
+    def _detailed_model_comparison(self, severe_pred, balanced_pred, severe_info, balanced_info):
+        """
+        Detailed comparison between the two best models
+        """
+        print("\n" + "="*70)
+        print("DETAILED MODEL COMPARISON")
+        print("="*70)
+        
+        target_names = ['Severe (1)', 'Serious (2)', 'Slight (3)']
+        
+        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+        
+        # Confusion matrices
+        cm_severe = confusion_matrix(self.y_test, severe_pred, labels=[1, 2, 3])
+        cm_balanced = confusion_matrix(self.y_test, balanced_pred, labels=[1, 2, 3])
+        
+        sns.heatmap(cm_severe, annot=True, fmt='d', cmap='Reds', 
+                    xticklabels=target_names, yticklabels=target_names, ax=axes[0,0])
+        axes[0,0].set_title(f'Severe-Optimized Model\n{severe_info["Model"]} + {severe_info["Sampling"]}')
+        axes[0,0].set_ylabel('True Label')
+        axes[0,0].set_xlabel('Predicted Label')
+        
+        sns.heatmap(cm_balanced, annot=True, fmt='d', cmap='Blues', 
+                    xticklabels=target_names, yticklabels=target_names, ax=axes[0,1])
+        axes[0,1].set_title(f'Balanced Model\n{balanced_info["Model"]} + {balanced_info["Sampling"]}')
+        axes[0,1].set_ylabel('True Label')
+        axes[0,1].set_xlabel('Predicted Label')
+        
+        # Per-class recall comparison
+        severe_recalls = [severe_info['Recall_Class1'], severe_info['Recall_Class2'], severe_info['Recall_Class3']]
+        balanced_recalls = [balanced_info['Recall_Class1'], balanced_info['Recall_Class2'], balanced_info['Recall_Class3']]
+        
+        x = np.arange(3)
+        width = 0.35
+        
+        axes[1,0].bar(x - width/2, severe_recalls, width, label='Severe-Optimized', color='red', alpha=0.7)
+        axes[1,0].bar(x + width/2, balanced_recalls, width, label='Balanced', color='blue', alpha=0.7)
+        axes[1,0].set_xlabel('Accident Severity Class')
+        axes[1,0].set_ylabel('Recall')
+        axes[1,0].set_title('Per-Class Recall Comparison')
+        axes[1,0].set_xticks(x)
+        axes[1,0].set_xticklabels(['Severe (1)', 'Serious (2)', 'Slight (3)'])
+        axes[1,0].legend()
+        axes[1,0].set_ylim(0, 1)
+        
+        # Business impact analysis
+        severe_stats = self._calculate_business_impact(cm_severe)
+        balanced_stats = self._calculate_business_impact(cm_balanced)
+        
+        impact_metrics = ['Severe Detected', 'False Alarms', 'Severe Missed', 'Precision %']
+        severe_values = [severe_stats['detected'], severe_stats['false_alarms'], 
+                        severe_stats['missed'], severe_stats['precision']*100]
+        balanced_values = [balanced_stats['detected'], balanced_stats['false_alarms'], 
+                          balanced_stats['missed'], balanced_stats['precision']*100]
+        
+        x_impact = np.arange(len(impact_metrics))
+        axes[1,1].bar(x_impact - width/2, severe_values, width, label='Severe-Optimized', color='red', alpha=0.7)
+        axes[1,1].bar(x_impact + width/2, balanced_values, width, label='Balanced', color='blue', alpha=0.7)
+        axes[1,1].set_xlabel('Impact Metrics')
+        axes[1,1].set_ylabel('Count / Percentage')
+        axes[1,1].set_title('Business Impact Comparison')
+        axes[1,1].set_xticks(x_impact)
+        axes[1,1].set_xticklabels(impact_metrics, rotation=45)
+        axes[1,1].legend()
+        
+        plt.tight_layout()
+        plt.show()
+        
+    def _calculate_business_impact(self, cm):
+        """Calculate business impact metrics from confusion matrix"""
+        # Assuming cm is ordered as [Severe, Serious, Slight]
+        severe_detected = cm[0, 0]  # True positives for severe
+        severe_missed = cm[0, 1] + cm[0, 2]  # False negatives for severe
+        false_alarms = cm[1, 0] + cm[2, 0]  # False positives for severe
+        
+        precision = severe_detected / (severe_detected + false_alarms) if (severe_detected + false_alarms) > 0 else 0
+        
+        return {
+            'detected': severe_detected,
+            'missed': severe_missed,
+            'false_alarms': false_alarms,
+            'precision': precision
+        }
+        
