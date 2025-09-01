@@ -485,4 +485,96 @@ class AccidentSeverityClassifier:
             'false_alarms': false_alarms,
             'precision': precision
         }
+    
+    def calibrate_probabilities(self):
+        """
+        Calibrate probabilities for better threshold optimization
+        """
+        if not hasattr(self, 'best_severe_model') or not hasattr(self, 'best_balanced_model'):
+            print("Please evaluate models first!")
+            return
+        
+        print("="*50)
+        print("PROBABILITY CALIBRATION")
+        print("="*50)
+        
+        models_to_calibrate = {
+            'Severe-Optimized': self.best_severe_model,
+            'Balanced': self.best_balanced_model
+        }
+        
+        for name, model in models_to_calibrate.items():
+            print(f"\nCalibrating {name} model...")
+            
+            # Use the training data that was used for the best model
+            # For simplicity, using the current training data
+            calibrated_model = CalibratedClassifierCV(model, method='isotonic', cv=3)
+            
+            try:
+                if hasattr(model, 'predict_proba'):
+                    calibrated_model.fit(self.X_train, self.y_train)
+                    self.calibrated_models[name] = calibrated_model
+                    print(f"{name} model calibrated successfully")
+                else:
+                    print(f"{name} model doesn't support probability prediction")
+            except Exception as e:
+                print(f"Error calibrating {name} model: {e}")
+        
+        return self.calibrated_models
+    
+    def optimize_threshold(self):
+        """
+        Optimize threshold to maximize recall for severe cases
+        """
+        if self.best_model is None:
+            print("Please evaluate models first!")
+            return
+        
+        print("="*50)
+        print("THRESHOLD OPTIMIZATION")
+        print("="*50)
+        
+        # Get probabilities for severe cases
+        if hasattr(self.best_model, 'predict_proba'):
+            y_proba = self.best_model.predict_proba(self.X_test)
+            
+            # For multi-class, we focus on severe cases (class 1, index 0)
+            y_proba_severe = y_proba[:, 0]  # Assuming severe cases are at index 0
+            
+            # Calculate precision and recall for different thresholds
+            y_true_binary = (self.y_test == 1).astype(int)  # Binary: severe vs non-severe
+            
+            precision, recall, thresholds = precision_recall_curve(y_true_binary, y_proba_severe)
+            
+            # Find threshold that gives recall >= 0.95 for severe cases
+            target_recall = 0.95
+            valid_indices = recall >= target_recall
+            
+            if valid_indices.any():
+                best_threshold_idx = np.where(valid_indices)[0][0]
+                best_threshold = thresholds[best_threshold_idx]
+                best_precision = precision[best_threshold_idx]
+                best_recall = recall[best_threshold_idx]
+                
+                print(f"Threshold for {target_recall*100}% recall on severe cases: {best_threshold:.4f}")
+                print(f"Precision at this threshold: {best_precision:.4f}")
+                print(f"Recall at this threshold: {best_recall:.4f}")
+                
+                # Plot precision-recall curve
+                plt.figure(figsize=(10, 6))
+                plt.plot(recall, precision, marker='.')
+                plt.axvline(x=target_recall, color='red', linestyle='--', 
+                           label=f'Target Recall ({target_recall})')
+                plt.axhline(y=best_precision, color='red', linestyle='--', alpha=0.5)
+                plt.xlabel('Recall')
+                plt.ylabel('Precision')
+                plt.title('Precision-Recall Curve for Severe Cases')
+                plt.legend()
+                plt.grid(True)
+                plt.show()
+                
+                return best_threshold
+            else:
+                print(f"Cannot achieve {target_recall*100}% recall with this model")
+                return None
         
