@@ -577,4 +577,5 @@ class AccidentSeverityClassifier:
             else:
                 print(f"Cannot achieve {target_recall*100}% recall with this model")
                 return None
-        
+
+
