@@ -522,60 +522,217 @@ class AccidentSeverityClassifier:
         
         return self.calibrated_models
     
-    def optimize_threshold(self):
+    def optimize_threshold(self, model_type='severe'):
         """
-        Optimize threshold to maximize recall for severe cases
+        Optimize threshold for different strategies
+        model_type: 'severe' for severe-optimized model, 'balanced' for balanced model
         """
-        if self.best_model is None:
+        model = self.best_severe_model if model_type == 'severe' else self.best_balanced_model
+        model_name = "Severe-Optimized" if model_type == 'severe' else "Balanced"
+        
+        if model is None:
             print("Please evaluate models first!")
             return
         
-        print("="*50)
-        print("THRESHOLD OPTIMIZATION")
-        print("="*50)
+        print("="*60)
+        print(f"THRESHOLD OPTIMIZATION - {model_name.upper()} MODEL")
+        print("="*60)
         
         # Get probabilities for severe cases
-        if hasattr(self.best_model, 'predict_proba'):
-            y_proba = self.best_model.predict_proba(self.X_test)
+        if hasattr(model, 'predict_proba'):
+            y_proba = model.predict_proba(self.X_test)
             
-            # For multi-class, we focus on severe cases (class 1, index 0)
-            y_proba_severe = y_proba[:, 0]  # Assuming severe cases are at index 0
+            # For multi-class, we focus on severe cases (class 1)
+            # Find the index of class 1 in the model's classes
+            class_1_idx = list(model.classes_).index(1) if 1 in model.classes_ else 0
+            y_proba_severe = y_proba[:, class_1_idx]
             
             # Calculate precision and recall for different thresholds
             y_true_binary = (self.y_test == 1).astype(int)  # Binary: severe vs non-severe
             
+            # Check if there are any severe cases in test set
+            if y_true_binary.sum() == 0:
+                print(f"Warning: No severe cases (class 1) found in test set for {model_name} model")
+                return None
+            
             precision, recall, thresholds = precision_recall_curve(y_true_binary, y_proba_severe)
             
-            # Find threshold that gives recall >= 0.95 for severe cases
+            # Check if we have valid data for threshold optimization
+            if len(precision) == 0 or len(recall) == 0 or len(thresholds) == 0:
+                print(f"Warning: Insufficient data for threshold optimization in {model_name} model")
+                print(f"Precision array length: {len(precision)}, Recall array length: {len(recall)}, Thresholds length: {len(thresholds)}")
+                return None
+            
+            
+            
+            # Find multiple threshold options
+            threshold_options = {}
+            
+            # Option 1: Maximum recall (95%+)
             target_recall = 0.95
             valid_indices = recall >= target_recall
+            if valid_indices.any() and len(thresholds) > 0:
+                valid_positions = np.where(valid_indices)[0]
+                if len(valid_positions) > 0 and valid_positions[0] < len(thresholds):
+                    idx = valid_positions[0]
+                    threshold_options['High Recall (95%)'] = {
+                        'threshold': thresholds[idx],
+                        'precision': precision[idx],
+                        'recall': recall[idx]
+                    }
             
-            if valid_indices.any():
-                best_threshold_idx = np.where(valid_indices)[0][0]
-                best_threshold = thresholds[best_threshold_idx]
-                best_precision = precision[best_threshold_idx]
-                best_recall = recall[best_threshold_idx]
-                
-                print(f"Threshold for {target_recall*100}% recall on severe cases: {best_threshold:.4f}")
-                print(f"Precision at this threshold: {best_precision:.4f}")
-                print(f"Recall at this threshold: {best_recall:.4f}")
-                
-                # Plot precision-recall curve
-                plt.figure(figsize=(10, 6))
-                plt.plot(recall, precision, marker='.')
-                plt.axvline(x=target_recall, color='red', linestyle='--', 
-                           label=f'Target Recall ({target_recall})')
-                plt.axhline(y=best_precision, color='red', linestyle='--', alpha=0.5)
-                plt.xlabel('Recall')
-                plt.ylabel('Precision')
-                plt.title('Precision-Recall Curve for Severe Cases')
-                plt.legend()
-                plt.grid(True)
-                plt.show()
-                
-                return best_threshold
-            else:
-                print(f"Cannot achieve {target_recall*100}% recall with this model")
+            # Option 2: Balanced precision-recall
+            if len(thresholds) > 0 and len(precision) > 0 and len(recall) > 0:
+                f1_scores = 2 * (precision * recall) / (precision + recall + 1e-8)
+                best_f1_idx = np.argmax(f1_scores)
+                # Ensure we don't go out of bounds
+                if best_f1_idx < len(thresholds):
+                    threshold_options['Best F1'] = {
+                        'threshold': thresholds[best_f1_idx],
+                        'precision': precision[best_f1_idx],
+                        'recall': recall[best_f1_idx]
+                    }
+            
+            # Option 3: Minimum precision constraint (e.g., 10%)
+            min_precision = 0.10
+            valid_precision_indices = precision >= min_precision
+            if valid_precision_indices.any() and len(thresholds) > 0:
+                # Among valid precision, get highest recall
+                valid_indices_positions = np.where(valid_precision_indices)[0]
+                if len(valid_indices_positions) > 0:
+                    # Get the recalls for valid precision points
+                    valid_recalls = recall[valid_precision_indices]
+                    if len(valid_recalls) > 0:
+                        best_recall_idx = np.argmax(valid_recalls)
+                        # Make sure we don't go out of bounds
+                        if best_recall_idx < len(valid_indices_positions):
+                            actual_idx = valid_indices_positions[best_recall_idx]
+                            # Ensure actual_idx is within thresholds bounds
+                            if actual_idx < len(thresholds):
+                                threshold_options['Min 10% Precision'] = {
+                                    'threshold': thresholds[actual_idx],
+                                    'precision': precision[actual_idx],
+                                    'recall': recall[actual_idx]
+                                }
+            
+            # Display threshold options
+            if len(threshold_options) == 0:
+                print(f"No valid threshold options found for {model_name} model")
+                print("This might be due to:")
+                print("- Very few severe cases in test set")
+                print("- Model not producing meaningful probabilities for severe cases")
+                print("- Extremely imbalanced predictions")
                 return None
-
-
+            
+            print(f"\n THRESHOLD OPTIONS FOR {model_name} MODEL:")
+            print("-" * 50)
+            for option_name, metrics in threshold_options.items():
+                print(f"{option_name}:")
+                print(f"  Threshold: {metrics['threshold']:.4f}")
+                print(f"  Precision: {metrics['precision']:.3f} ({metrics['precision']*100:.1f}%)")
+                print(f"  Recall: {metrics['recall']:.3f} ({metrics['recall']*100:.1f}%)")
+                
+                # Calculate expected false alarms
+                n_predicted_positive = (y_proba_severe >= metrics['threshold']).sum()
+                n_true_positive = int(metrics['recall'] * (self.y_test == 1).sum())
+                n_false_positive = n_predicted_positive - n_true_positive
+                print(f"  Expected false alarms: {n_false_positive} out of {n_predicted_positive} alerts")
+                print()
+            
+            # Plot precision-recall curve with threshold options
+            plt.figure(figsize=(12, 5))
+            
+            plt.subplot(1, 2, 1)
+            plt.plot(recall, precision, marker='.', alpha=0.7)
+            
+            # Mark threshold options
+            colors = ['red', 'green', 'orange']
+            for i, (option_name, metrics) in enumerate(threshold_options.items()):
+                plt.scatter(metrics['recall'], metrics['precision'], 
+                           color=colors[i % len(colors)], s=100, 
+                           label=f"{option_name}", zorder=5)
+            
+            plt.xlabel('Recall')
+            plt.ylabel('Precision')
+            plt.title(f'Precision-Recall Curve\n{model_name} Model')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            
+            # Plot threshold vs metrics
+            plt.subplot(1, 2, 2)
+            plt.plot(thresholds, precision[:-1], label='Precision', alpha=0.7)
+            plt.plot(thresholds, recall[:-1], label='Recall', alpha=0.7)
+            
+            # Mark threshold options
+            for i, (option_name, metrics) in enumerate(threshold_options.items()):
+                plt.axvline(x=metrics['threshold'], color=colors[i % len(colors)], 
+                           linestyle='--', alpha=0.7, label=f"{option_name}")
+            
+            plt.xlabel('Threshold')
+            plt.ylabel('Score')
+            plt.title('Threshold vs Precision/Recall')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            plt.show()
+            
+            return threshold_options
+        
+        else:
+            print(f"Model {model_name} doesn't support probability prediction")
+            return None
+        
+    def apply_custom_thresholds(self, thresholds_dict):
+        """
+        Apply custom thresholds and evaluate performance
+        thresholds_dict: {'severe': threshold_value, 'balanced': threshold_value}
+        """
+        print("="*60)
+        print("CUSTOM THRESHOLD APPLICATION")
+        print("="*60)
+        
+        results = {}
+        
+        for model_type, threshold in thresholds_dict.items():
+            model = self.best_severe_model if model_type == 'severe' else self.best_balanced_model
+            model_name = "Severe-Optimized" if model_type == 'severe' else "Balanced"
+            
+            if model is None:
+                continue
+                
+            # Get probabilities
+            y_proba = model.predict_proba(self.X_test)
+            class_1_idx = list(model.classes_).index(1) if 1 in model.classes_ else 0
+            y_proba_severe = y_proba[:, class_1_idx]
+            
+            # Apply custom threshold for severe cases
+            y_pred_custom = model.predict(self.X_test)
+            y_pred_custom[y_proba_severe >= threshold] = 1
+            
+            # Calculate metrics
+            cm = confusion_matrix(self.y_test, y_pred_custom, labels=[1, 2, 3])
+            
+            # Per-class metrics
+            recall_per_class = recall_score(self.y_test, y_pred_custom, average=None, labels=[1, 2, 3])
+            precision_per_class = precision_score(self.y_test, y_pred_custom, average=None, labels=[1, 2, 3], zero_division=0)
+            
+            results[model_type] = {
+                'model_name': model_name,
+                'threshold': threshold,
+                'predictions': y_pred_custom,
+                'confusion_matrix': cm,
+                'recall_severe': recall_per_class[0],
+                'precision_severe': precision_per_class[0],
+                'recall_macro': recall_score(self.y_test, y_pred_custom, average='macro'),
+                'accuracy': accuracy_score(self.y_test, y_pred_custom)
+            }
+            
+            print(f"\n{model_name} Model with Threshold {threshold:.4f}:")
+            print(f"  Severe Case Recall: {recall_per_class[0]:.3f}")
+            print(f"  Severe Case Precision: {precision_per_class[0]:.3f}")
+            print(f"  Macro Recall: {recall_score(self.y_test, y_pred_custom, average='macro'):.3f}")
+            print(f"  Accuracy: {accuracy_score(self.y_test, y_pred_custom):.3f}")
+        
+        return results
+    
