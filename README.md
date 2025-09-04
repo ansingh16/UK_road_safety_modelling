@@ -30,14 +30,17 @@ Data for 2023 is publicly available from the **UK Department for Transport**:
 * **Matplotlib / Seaborn** - Model evaluation and performance visualization
 * **Joblib** - Model serialization for production deployment
 
-**📈 Model Performance**
-| Strategy | Severe Recall | Severe Precision | Macro Recall | Use Case |
-|----------|---------------|------------------|--------------|----------|
-| **Emergency Response** | **92.4%** | 3.6% | 65% | Critical case detection |
-| **Traffic Management** | 78% | **15%** | **72%** | Balanced classification |
+KEY INSIGHTS:
 
-**🚨 Business Impact**
-* **Emergency Services**: 92.4% severe case detection ensures rapid response to life-threatening accidents
-* **Resource Allocation**: Balanced model reduces false alarms while maintaining good overall performance  
-* **Cost-Benefit Analysis**: Trade-off quantification helps authorities choose optimal deployment strategy
-* **Scalable Solution**: Production-ready models with comprehensive monitoring and evaluation frameworks
+   - Severe-optimized model: Perfect for emergency services (don't miss critical cases)
+   - Balanced model: Better for general traffic management and resource planning
+   - SMOTE+Tomek sampling consistently performs well across both strategies
+   - Class imbalance is successfully handled through multiple techniques
+
+|Metric              |      Severe-Optimized |  Balanced      |     Difference     
+|--------------------|-----------------------|----------------|---------------------
+|Severe Recall       |      0.997            |   0.868        |       +0.128
+|Severe Precision    |      0.024            |   0.130        |       -0.106
+|Macro Recall        |      0.561            |   0.812        |       -0.251
+|Overall Accuracy    |      0.223            |   0.843        |       -0.620
+|====================|=======================|================|=====================

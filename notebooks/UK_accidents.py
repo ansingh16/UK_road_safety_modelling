@@ -1,12 +1,12 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.metrics import (classification_report, confusion_matrix, 
-                           precision_recall_curve, roc_auc_score, f1_score,
-                           recall_score, precision_score, make_scorer, accuracy_score)
+from sklearn.metrics import ( confusion_matrix, 
+                           precision_recall_curve,  f1_score,
+                           recall_score, precision_score,  accuracy_score)
 from sklearn.calibration import CalibratedClassifierCV
 from imblearn.over_sampling import SMOTE, ADASYN
 from imblearn.under_sampling import RandomUnderSampler
@@ -17,6 +17,7 @@ import seaborn as sns
 from collections import Counter
 import warnings
 import lightgbm as lgb
+import joblib
 
 warnings.filterwarnings('ignore')
 
@@ -736,3 +737,58 @@ class AccidentSeverityClassifier:
         
         return results
     
+    def generate_summary_report(self):
+        """
+        Generate a comprehensive summary report comparing both strategies
+        """
+        print("="*80)
+        print("                    ACCIDENT SEVERITY CLASSIFICATION")
+        print("                    COMPREHENSIVE SUMMARY REPORT")
+        print("="*80)
+        
+        if hasattr(self, 'results_df') and hasattr(self, 'best_severe_model') and hasattr(self, 'best_balanced_model'):
+            # Get best results
+            severe_results = self.results_df.sort_values('Recall_Severe', ascending=False).iloc[0]
+            balanced_results = self.results_df.sort_values('Recall_Macro', ascending=False).iloc[0]
+            
+            print(f"""
+                    DATASET OVERVIEW:
+                - Total samples: {len(self.data):,}
+                - Severe (1): {(self.data['accident_severity'] == 1).sum():,} ({(self.data['accident_severity'] == 1).mean()*100:.1f}%)
+                - Serious (2): {(self.data['accident_severity'] == 2).sum():,} ({(self.data['accident_severity'] == 2).mean()*100:.1f}%)
+                - Slight (3): {(self.data['accident_severity'] == 3).sum():,} ({(self.data['accident_severity'] == 3).mean()*100:.1f}%)
+
+                STRATEGY 1: SEVERE CASE DETECTION (EMERGENCY RESPONSE)
+                - Model: {severe_results['Model']} with {severe_results['Sampling']}
+                - Severe Case Recall: {severe_results['Recall_Severe']:.1%} ← EXCELLENT for not missing severe accidents
+                - Severe Case Precision: {severe_results['Severe_Precision_Actual']:.1%} ← Low, but acceptable for emergency use
+                - Overall Accuracy: {severe_results['Accuracy']:.1%}
+                - Trade-off: High false alarms but catches almost all severe cases
+
+                STRATEGY 2: BALANCED PERFORMANCE (GENERAL CLASSIFICATION)
+                - Model: {balanced_results['Model']} with {balanced_results['Sampling']}
+                - Macro Recall: {balanced_results['Recall_Macro']:.1%} ← Better overall balance
+                - Severe Case Recall: {balanced_results['Recall_Severe']:.1%} ← Still good for severe detection
+                - Overall Accuracy: {balanced_results['Accuracy']:.1%}
+                - Trade-off: More balanced but might miss some severe cases
+
+            """)
+            
+    def save_models(self, save_path="."):
+        """
+        Save the trained models for production use
+        """
+        
+        
+        if hasattr(self, 'best_severe_model') and self.best_severe_model is not None:
+            joblib.dump(self.best_severe_model, f"{save_path}/accident_severity_model_severe_optimized.pkl")
+            print(f" Severe-optimized model saved as accident_severity_model_severe_optimized.pkl")
+        
+        if hasattr(self, 'best_balanced_model') and self.best_balanced_model is not None:
+            joblib.dump(self.best_balanced_model, f"{save_path}/accident_severity_model_balanced.pkl")
+            print(f" Balanced model saved as accident_severity_model_balanced.pkl")
+        
+        # Save preprocessing components
+        joblib.dump(self.scaler, f"{save_path}/accident_severity_model_scaler.pkl")
+        joblib.dump(self.label_encoders, f"{save_path}/accident_severity_model_label_encoders.pkl")
+        print(f" Preprocessing components saved")
