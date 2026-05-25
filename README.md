@@ -44,3 +44,37 @@ KEY INSIGHTS:
 |Macro Recall        |      0.561            |   0.812        |       -0.251
 |Overall Accuracy    |      0.223            |   0.843        |       -0.620
 |====================|=======================|================|=====================
+
+**📂 Project Structure**
+
+```
+UK_road_safety_modelling/
+├── notebooks/
+│   ├── Data_Wrangling.ipynb     # Data loading, merging, EDA, feature engineering
+│   ├── Data_Modelling.ipynb     # Model training, evaluation, threshold optimization
+│   ├── UK_accidents.py          # Helper functions for data processing and modeling
+│   └── UK_road_safety.py        # Utility functions
+├── data/                        # DfT CSV files (gitignored)
+├── models/                      # Trained model pickles (gitignored)
+├── requirements.txt
+└── .gitignore
+```
+
+**📥 Data**
+
+Download the 2023 road safety data from the UK Department for Transport:
+https://www.data.gov.uk/dataset/cb7ae6f0-4be6-4935-9277-47e5ce24a11f/road-safety-data
+
+Place the three CSV files (collision, vehicle, casualty) in the `data/` directory.
+
+**🚀 How to Run**
+
+```bash
+git clone https://github.com/ansingh16/UK_road_safety_modelling.git
+cd UK_road_safety_modelling
+pip install -r requirements.txt
+```
+
+Run the notebooks in order:
+1. `notebooks/Data_Wrangling.ipynb` -- loads, merges, and preprocesses the three DfT CSV files
+2. `notebooks/Data_Modelling.ipynb` -- trains both models, runs evaluation, and saves results
