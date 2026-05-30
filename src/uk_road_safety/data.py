@@ -5,10 +5,21 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 
 
-def load_dft_data(data_dir, years=None):
-    """Load and merge DfT collision + vehicle CSVs for the given years.
+def load_dft_data(data_dir, years=None, merge_vehicles=True):
+    """Load DfT collision CSVs, optionally merged with vehicle CSVs.
 
-    Returns a merged DataFrame indexed by accident_index.
+    Parameters
+    ----------
+    data_dir : str or Path
+        Directory containing the DfT CSV files.
+    years : list[int], optional
+        Which years to load (default [2023]).
+    merge_vehicles : bool
+        If True, merge collision and vehicle tables on accident_index.
+        Set to False to load collision data only (matches the original
+        36-feature training set).
+
+    Returns a DataFrame indexed by accident_index.
     """
     if years is None:
         years = [2023]
@@ -19,15 +30,20 @@ def load_dft_data(data_dir, years=None):
         data_dir / f"dft-road-casualty-statistics-collision-{year}.csv"
         for year in years
     ]
-    vehicle_files = [
-        data_dir / f"dft-road-casualty-statistics-vehicle-{year}.csv"
-        for year in years
-    ]
 
     df_collisions = pd.concat(
         [pd.read_csv(f, low_memory=False) for f in collision_files]
     )
+
+    if not merge_vehicles:
+        return df_collisions
+
     df_collisions.set_index("accident_index", inplace=True)
+
+    vehicle_files = [
+        data_dir / f"dft-road-casualty-statistics-vehicle-{year}.csv"
+        for year in years
+    ]
 
     df_vehicles = pd.concat(
         [pd.read_csv(f, low_memory=False) for f in vehicle_files]
