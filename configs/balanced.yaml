@@ -1,0 +1,48 @@
+strategy: balanced
+description: >
+  Traffic management configuration — optimises macro recall across all three
+  severity classes. Use for general resource allocation, congestion planning,
+  and incident classification dashboards.
+
+data:
+  years: [2023]
+  test_size: 0.2
+
+sampling:
+  method: SMOTE
+  random_state: 42
+
+models:
+  RF_Balanced:
+    type: RandomForestClassifier
+    params:
+      n_estimators: 100
+      max_depth: 10
+      class_weight: balanced
+      random_state: 42
+
+  LR_Balanced:
+    type: LogisticRegression
+    params:
+      class_weight: balanced
+      max_iter: 1000
+      random_state: 42
+
+  BalancedRF:
+    type: BalancedRandomForestClassifier
+    params:
+      n_estimators: 100
+      random_state: 42
+
+  LightGBM_Balanced:
+    type: LGBMClassifier
+    params:
+      objective: multiclass
+      num_class: 3
+      class_weight: balanced
+      n_estimators: 100
+      random_state: 42
+      verbosity: -1
+
+threshold:
+  optimise: false
