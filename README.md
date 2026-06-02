@@ -1,5 +1,7 @@
 **UK Road Accident Severity Classification - Dual Strategy Approach (2023)**
 
+[![CI](https://github.com/ansingh16/UK_road_safety_modelling/actions/workflows/ci.yml/badge.svg)](https://github.com/ansingh16/UK_road_safety_modelling/actions/workflows/ci.yml)
+
 **📌 Project Overview**
 This project leverages the **UK Department for Transport Road Safety Data (2023)** to develop a comprehensive accident severity prediction system with two optimization strategies:
 * **Emergency Response Model** - Achieves 92.4% recall for severe accidents to ensure no critical cases are missed
