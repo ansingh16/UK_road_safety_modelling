@@ -1,7 +1,7 @@
-import joblib
-import numpy as np
-import pandas as pd
 from pathlib import Path
+
+import joblib
+import pandas as pd
 
 
 def load_model_artifacts(model_dir):
@@ -36,7 +36,9 @@ def load_model_artifacts(model_dir):
     return artifacts
 
 
-def save_model_artifacts(model_dir, severe_model=None, balanced_model=None, scaler=None, label_encoders=None):
+def save_model_artifacts(
+    model_dir, severe_model=None, balanced_model=None, scaler=None, label_encoders=None
+):
     """Save model artifacts to disk."""
     model_dir = Path(model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)

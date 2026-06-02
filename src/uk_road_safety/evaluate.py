@@ -1,12 +1,9 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 from sklearn.metrics import (
     confusion_matrix,
     precision_recall_curve,
-    recall_score,
-    precision_score,
-    accuracy_score,
 )
 
 
@@ -38,7 +35,9 @@ def calculate_business_impact(cm):
     }
 
 
-def plot_model_comparison(y_test, severe_pred, balanced_pred, severe_info, balanced_info, save_path=None):
+def plot_model_comparison(
+    y_test, severe_pred, balanced_pred, severe_info, balanced_info, save_path=None
+):
     """Side-by-side confusion matrices and per-class recall bars."""
     target_names = ["Severe (1)", "Serious (2)", "Slight (3)"]
 
@@ -48,28 +47,50 @@ def plot_model_comparison(y_test, severe_pred, balanced_pred, severe_info, balan
     cm_balanced = confusion_matrix(y_test, balanced_pred, labels=[1, 2, 3])
 
     sns.heatmap(
-        cm_severe, annot=True, fmt="d", cmap="Reds",
-        xticklabels=target_names, yticklabels=target_names, ax=axes[0, 0],
+        cm_severe,
+        annot=True,
+        fmt="d",
+        cmap="Reds",
+        xticklabels=target_names,
+        yticklabels=target_names,
+        ax=axes[0, 0],
     )
     axes[0, 0].set_title(f"Severe-Optimized\n{severe_info['Model']} + {severe_info['Sampling']}")
     axes[0, 0].set_ylabel("True Label")
     axes[0, 0].set_xlabel("Predicted Label")
 
     sns.heatmap(
-        cm_balanced, annot=True, fmt="d", cmap="Blues",
-        xticklabels=target_names, yticklabels=target_names, ax=axes[0, 1],
+        cm_balanced,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=target_names,
+        yticklabels=target_names,
+        ax=axes[0, 1],
     )
     axes[0, 1].set_title(f"Balanced\n{balanced_info['Model']} + {balanced_info['Sampling']}")
     axes[0, 1].set_ylabel("True Label")
     axes[0, 1].set_xlabel("Predicted Label")
 
-    severe_recalls = [severe_info["Recall_Class1"], severe_info["Recall_Class2"], severe_info["Recall_Class3"]]
-    balanced_recalls = [balanced_info["Recall_Class1"], balanced_info["Recall_Class2"], balanced_info["Recall_Class3"]]
+    severe_recalls = [
+        severe_info["Recall_Class1"],
+        severe_info["Recall_Class2"],
+        severe_info["Recall_Class3"],
+    ]
+    balanced_recalls = [
+        balanced_info["Recall_Class1"],
+        balanced_info["Recall_Class2"],
+        balanced_info["Recall_Class3"],
+    ]
 
     x = np.arange(3)
     width = 0.35
-    axes[1, 0].bar(x - width / 2, severe_recalls, width, label="Severe-Optimized", color="red", alpha=0.7)
-    axes[1, 0].bar(x + width / 2, balanced_recalls, width, label="Balanced", color="blue", alpha=0.7)
+    axes[1, 0].bar(
+        x - width / 2, severe_recalls, width, label="Severe-Optimized", color="red", alpha=0.7
+    )
+    axes[1, 0].bar(
+        x + width / 2, balanced_recalls, width, label="Balanced", color="blue", alpha=0.7
+    )
     axes[1, 0].set_xlabel("Accident Severity Class")
     axes[1, 0].set_ylabel("Recall")
     axes[1, 0].set_title("Per-Class Recall Comparison")
@@ -82,14 +103,26 @@ def plot_model_comparison(y_test, severe_pred, balanced_pred, severe_info, balan
     balanced_impact = calculate_business_impact(cm_balanced)
 
     impact_labels = ["Severe Detected", "False Alarms", "Severe Missed", "Precision %"]
-    severe_vals = [severe_impact["detected"], severe_impact["false_alarms"],
-                   severe_impact["missed"], severe_impact["precision"] * 100]
-    balanced_vals = [balanced_impact["detected"], balanced_impact["false_alarms"],
-                     balanced_impact["missed"], balanced_impact["precision"] * 100]
+    severe_vals = [
+        severe_impact["detected"],
+        severe_impact["false_alarms"],
+        severe_impact["missed"],
+        severe_impact["precision"] * 100,
+    ]
+    balanced_vals = [
+        balanced_impact["detected"],
+        balanced_impact["false_alarms"],
+        balanced_impact["missed"],
+        balanced_impact["precision"] * 100,
+    ]
 
     x_imp = np.arange(len(impact_labels))
-    axes[1, 1].bar(x_imp - width / 2, severe_vals, width, label="Severe-Optimized", color="red", alpha=0.7)
-    axes[1, 1].bar(x_imp + width / 2, balanced_vals, width, label="Balanced", color="blue", alpha=0.7)
+    axes[1, 1].bar(
+        x_imp - width / 2, severe_vals, width, label="Severe-Optimized", color="red", alpha=0.7
+    )
+    axes[1, 1].bar(
+        x_imp + width / 2, balanced_vals, width, label="Balanced", color="blue", alpha=0.7
+    )
     axes[1, 1].set_xlabel("Impact Metrics")
     axes[1, 1].set_ylabel("Count / Percentage")
     axes[1, 1].set_title("Business Impact Comparison")
@@ -147,7 +180,9 @@ def optimize_threshold(model, X_test, y_test, target_recall=0.95):
     return options if options else None
 
 
-def plot_precision_recall_curve(model, X_test, y_test, title="Precision-Recall Curve", save_path=None):
+def plot_precision_recall_curve(
+    model, X_test, y_test, title="Precision-Recall Curve", save_path=None
+):
     """Plot the precision-recall curve for severe case detection."""
     if not hasattr(model, "predict_proba"):
         return

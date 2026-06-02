@@ -1,18 +1,17 @@
 import pandas as pd
-import numpy as np
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from imblearn.combine import SMOTETomek
+from imblearn.ensemble import BalancedRandomForestClassifier
+from imblearn.over_sampling import ADASYN, SMOTE
+from imblearn.under_sampling import RandomUnderSampler
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
-    recall_score,
-    precision_score,
-    f1_score,
     accuracy_score,
     confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
 )
-from imblearn.over_sampling import SMOTE, ADASYN
-from imblearn.combine import SMOTETomek
-from imblearn.under_sampling import RandomUnderSampler
-from imblearn.ensemble import BalancedRandomForestClassifier
 
 try:
     import lightgbm as lgb
@@ -164,9 +163,7 @@ def train_models(
                 precision_severe = precision_score(
                     y_test, y_pred, labels=[1], average="macro", zero_division=0
                 )
-                f1_severe = f1_score(
-                    y_test, y_pred, labels=[1], average="macro", zero_division=0
-                )
+                f1_severe = f1_score(y_test, y_pred, labels=[1], average="macro", zero_division=0)
 
                 recall_macro = recall_score(y_test, y_pred, average="macro")
                 f1_macro = f1_score(y_test, y_pred, average="macro")
@@ -178,14 +175,10 @@ def train_models(
                 severe_tp = cm[0, 0]
                 severe_fp = cm[1:, 0].sum()
                 severe_precision_actual = (
-                    severe_tp / (severe_tp + severe_fp)
-                    if (severe_tp + severe_fp) > 0
-                    else 0
+                    severe_tp / (severe_tp + severe_fp) if (severe_tp + severe_fp) > 0 else 0
                 )
 
-                model_type = (
-                    "Severe-Optimized" if "SevereOptim" in model_name else "Balanced"
-                )
+                model_type = "Severe-Optimized" if "SevereOptim" in model_name else "Balanced"
 
                 results.append(
                     {

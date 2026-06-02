@@ -8,20 +8,25 @@ Usage:
 """
 
 import argparse
+import sys
 from pathlib import Path
 
 import joblib
 import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import seaborn as sns
-from sklearn.metrics import confusion_matrix, precision_recall_curve, recall_score
 
-import sys
+matplotlib.use("Agg")  # headless backend for CI
+
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+import seaborn as sns  # noqa: E402
+from sklearn.metrics import (  # noqa: E402
+    confusion_matrix,
+    precision_recall_curve,
+    recall_score,
+)
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from uk_road_safety.data import load_dft_data, preprocess_features
+from uk_road_safety.data import load_dft_data, preprocess_features  # noqa: E402
 
 
 def plot_confusion_matrices(y_test, severe_pred, balanced_pred, save_path):
@@ -32,16 +37,26 @@ def plot_confusion_matrices(y_test, severe_pred, balanced_pred, save_path):
     cm_bal = confusion_matrix(y_test, balanced_pred, labels=[1, 2, 3])
 
     sns.heatmap(
-        cm_sev, annot=True, fmt="d", cmap="Reds",
-        xticklabels=target_names, yticklabels=target_names, ax=axes[0],
+        cm_sev,
+        annot=True,
+        fmt="d",
+        cmap="Reds",
+        xticklabels=target_names,
+        yticklabels=target_names,
+        ax=axes[0],
     )
     axes[0].set_title("Severe-Optimized Model")
     axes[0].set_ylabel("True Label")
     axes[0].set_xlabel("Predicted Label")
 
     sns.heatmap(
-        cm_bal, annot=True, fmt="d", cmap="Blues",
-        xticklabels=target_names, yticklabels=target_names, ax=axes[1],
+        cm_bal,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        xticklabels=target_names,
+        yticklabels=target_names,
+        ax=axes[1],
     )
     axes[1].set_title("Balanced Model")
     axes[1].set_ylabel("True Label")
@@ -159,7 +174,9 @@ def main():
     balanced_pred = balanced_model.predict(X_bal)
 
     plot_confusion_matrices(y_test, severe_pred, balanced_pred, output / "confusion_matrices.png")
-    plot_feature_importance(balanced_model, feature_names, args.top_n, output / "feature_importance.png")
+    plot_feature_importance(
+        balanced_model, feature_names, args.top_n, output / "feature_importance.png"
+    )
     plot_precision_recall(severe_model, X_test, y_test, scaler, output / "precision_recall.png")
     plot_per_class_recall(y_test, severe_pred, balanced_pred, output / "per_class_recall.png")
 

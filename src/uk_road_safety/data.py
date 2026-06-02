@@ -1,8 +1,9 @@
-import pandas as pd
-import numpy as np
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 
 def load_dft_data(data_dir, years=None, merge_vehicles=True):
@@ -27,13 +28,10 @@ def load_dft_data(data_dir, years=None, merge_vehicles=True):
     data_dir = Path(data_dir)
 
     collision_files = [
-        data_dir / f"dft-road-casualty-statistics-collision-{year}.csv"
-        for year in years
+        data_dir / f"dft-road-casualty-statistics-collision-{year}.csv" for year in years
     ]
 
-    df_collisions = pd.concat(
-        [pd.read_csv(f, low_memory=False) for f in collision_files]
-    )
+    df_collisions = pd.concat([pd.read_csv(f, low_memory=False) for f in collision_files])
 
     if not merge_vehicles:
         return df_collisions
@@ -41,13 +39,10 @@ def load_dft_data(data_dir, years=None, merge_vehicles=True):
     df_collisions.set_index("accident_index", inplace=True)
 
     vehicle_files = [
-        data_dir / f"dft-road-casualty-statistics-vehicle-{year}.csv"
-        for year in years
+        data_dir / f"dft-road-casualty-statistics-vehicle-{year}.csv" for year in years
     ]
 
-    df_vehicles = pd.concat(
-        [pd.read_csv(f, low_memory=False) for f in vehicle_files]
-    )
+    df_vehicles = pd.concat([pd.read_csv(f, low_memory=False) for f in vehicle_files])
     df_vehicles.set_index("accident_index", inplace=True)
 
     df = df_collisions.merge(df_vehicles, left_index=True, right_index=True, how="left")
@@ -73,9 +68,7 @@ def preprocess_features(
     categorical_cols = X.select_dtypes(include=["object"]).columns
     label_encoders = {}
     for col in categorical_cols:
-        X[col] = X[col].fillna(
-            X[col].mode()[0] if not X[col].mode().empty else "Unknown"
-        )
+        X[col] = X[col].fillna(X[col].mode()[0] if not X[col].mode().empty else "Unknown")
         le = LabelEncoder()
         X[col] = le.fit_transform(X[col].astype(str))
         label_encoders[col] = le
