@@ -2,6 +2,13 @@
 data
 models
 
+# Streamlit local config / secrets
+.streamlit/
+
+# OS files
+.DS_Store
+Thumbs.db
+
 # Model binaries
 *.pt
 *.pth
