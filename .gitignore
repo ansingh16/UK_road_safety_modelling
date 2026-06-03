@@ -1,6 +1,5 @@
 # data
 data
-models
 
 # Streamlit local config / secrets
 .streamlit/
@@ -9,10 +8,14 @@ models
 .DS_Store
 Thumbs.db
 
-# Model binaries
+# Model binaries (large training artifacts)
 *.pt
 *.pth
-*.pkl
+
+# Keep trained model pickles in models/ for Streamlit Cloud deployment
+!models/
+models/*
+!models/*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
