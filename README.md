@@ -49,6 +49,10 @@ A Streamlit app (`app.py`) lets you set the conditions of a collision — speed
 limit, lighting, weather, road surface, junction type, etc. — and compare what
 each model predicts, alongside the balanced model's top feature importances.
 
+**Try it live:** [uk-road-safety-modelling.streamlit.app](https://uk-road-safety-modelling.streamlit.app/)
+
+To run locally:
+
 ```bash
 pip install -e ".[app]"
 streamlit run app.py

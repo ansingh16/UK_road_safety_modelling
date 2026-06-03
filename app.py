@@ -129,17 +129,23 @@ def build_feature_row(overrides, feature_order):
     return pd.DataFrame([row])[list(feature_order)]
 
 
-def render_prediction(name, model, scaler, features_df):
+def render_prediction(name, model, scaler, features_df, description="", key_metric=""):
     pred, proba = predict_severity(model, scaler, features_df)
     label = SEVERITY_LABELS.get(int(pred[0]), str(pred[0]))
     st.subheader(name)
+    if description:
+        st.caption(description)
     st.metric("Predicted severity", label)
+    if key_metric:
+        st.caption(key_metric)
     if proba is not None:
         prob_df = pd.DataFrame(
             {"Probability": proba[0]},
             index=[SEVERITY_LABELS[c] for c in model.classes_],
         )
+        st.caption("Class probabilities — the model's confidence for each severity level:")
         st.bar_chart(prob_df)
+    return label
 
 
 def main():
@@ -149,6 +155,32 @@ def main():
         "Set the conditions of a collision and compare predictions from the "
         "severe-optimized and balanced models. Trained on DfT 2023 road safety data."
     )
+
+    with st.expander("About this tool"):
+        st.markdown(
+            """
+**Two models, two strategies.** Severe/fatal collisions are only ~1.4% of the
+data, so no single model handles them well. This tool runs two complementary
+classifiers side-by-side:
+
+- **Severe-optimized** (Logistic Regression) — tuned to catch nearly all
+  severe/fatal cases (97.7% recall), at the cost of many false alarms (3.3%
+  precision, 33.8% accuracy). Use this when missing a severe case is the
+  bigger risk.
+- **Balanced** (Random Forest) — tuned for overall accuracy (83.9%) across all
+  three classes. Better precision on severe cases (12.0%) but misses more of
+  them (86.8% recall).
+
+**Severity classes** follow the DfT definitions: *Severe / Fatal* = at least
+one fatality or life-threatening injury; *Serious* = hospital admission or
+significant injury; *Slight* = minor or no hospital treatment.
+
+**How the inputs work.** The models use 36 features from DfT collision records.
+The sidebar exposes the 11 that are meaningful to set by hand; the other 25
+(location codes, police force, etc.) are held at their 2023 training-set
+median values.
+"""
+        )
 
     artifacts = get_artifacts()
     severe_model = artifacts["severe_model"]
@@ -166,10 +198,22 @@ def main():
 
     with st.sidebar:
         st.header("Collision conditions")
-        speed = st.select_slider("Speed limit (mph)", SPEED_LIMITS, value=30)
-        n_vehicles = st.slider("Number of vehicles", 1, 10, 2)
-        n_casualties = st.slider("Number of casualties", 1, 10, 1)
-        hour = st.slider("Hour of day", 0, 23, 9)
+        speed = st.select_slider(
+            "Speed limit (mph)", SPEED_LIMITS, value=30,
+            help="Posted speed limit on the road where the collision occurred.",
+        )
+        n_vehicles = st.slider(
+            "Number of vehicles", 1, 10, 2,
+            help="Total vehicles involved in the collision.",
+        )
+        n_casualties = st.slider(
+            "Number of casualties", 1, 10, 1,
+            help="Total persons injured across all severity levels.",
+        )
+        hour = st.slider(
+            "Hour of day", 0, 23, 9,
+            help="Approximate hour the collision occurred (24h format).",
+        )
         dow = st.selectbox("Day of week", list(DAY_OF_WEEK), format_func=DAY_OF_WEEK.get, index=3)
         light = st.selectbox(
             "Light conditions", list(LIGHT_CONDITIONS), format_func=LIGHT_CONDITIONS.get
@@ -186,7 +230,10 @@ def main():
         junction = st.selectbox(
             "Junction detail", list(JUNCTION_DETAIL), format_func=JUNCTION_DETAIL.get, index=2
         )
-        area = st.radio("Area", list(URBAN_RURAL), format_func=URBAN_RURAL.get, horizontal=True)
+        area = st.radio(
+            "Area", list(URBAN_RURAL), format_func=URBAN_RURAL.get, horizontal=True,
+            help="DfT urban/rural classification of the collision location.",
+        )
 
     overrides = {
         "speed_limit": float(speed),
@@ -205,14 +252,32 @@ def main():
 
     col1, col2 = st.columns(2)
     with col1:
-        # Severe-optimized model is LogisticRegression — needs scaled input.
-        render_prediction("Severe-optimized model", severe_model, scaler, features_df)
+        sev_label = render_prediction(
+            "Severe-optimized model", severe_model, scaler, features_df,
+            description="Logistic Regression — tuned to flag nearly all severe cases.",
+            key_metric="97.7% severe recall · 33.8% overall accuracy",
+        )
     with col2:
-        # Balanced model is a tree ensemble — uses raw (unscaled) features.
-        render_prediction("Balanced model", balanced_model, None, features_df)
+        bal_label = render_prediction(
+            "Balanced model", balanced_model, None, features_df,
+            description="Random Forest — tuned for overall accuracy across all classes.",
+            key_metric="86.8% severe recall · 83.9% overall accuracy",
+        )
+
+    if sev_label != bal_label:
+        st.info(
+            f"The models disagree: severe-optimized predicts **{sev_label}** while "
+            f"balanced predicts **{bal_label}**. This is expected — the severe model "
+            f"is deliberately aggressive about flagging high-severity cases."
+        )
 
     st.divider()
     st.subheader("Top feature importances (balanced model)")
+    st.caption(
+        "How much each feature contributes to the Random Forest's predictions "
+        "(Gini importance). Only the balanced model is shown — Logistic Regression "
+        "coefficients are not directly comparable as feature importances."
+    )
     if hasattr(balanced_model, "feature_importances_"):
         imp = (
             pd.Series(balanced_model.feature_importances_, index=feature_order)
