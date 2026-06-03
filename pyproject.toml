@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 lightgbm = ["lightgbm>=4.0"]
+app = ["streamlit>=1.30"]
 dev = ["pytest>=7.0", "ruff>=0.4"]
 
 [tool.setuptools.packages.find]

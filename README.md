@@ -44,6 +44,20 @@ of a missed severe collision versus the cost of a false alarm.
 | ![Confusion matrices](results/confusion_matrices.png) | ![Per-class recall](results/per_class_recall.png) |
 | ![Precision–recall (severe)](results/precision_recall.png) | ![Feature importance](results/feature_importance.png) |
 
+## 🚦 Interactive dashboard
+
+A Streamlit app (`app.py`) lets you set the conditions of a collision — speed
+limit, lighting, weather, road surface, junction type, etc. — and compare what
+each model predicts, alongside the balanced model's top feature importances.
+
+```bash
+pip install -e ".[app]"
+streamlit run app.py
+```
+
+The non-interactive features are held at their 2023 training-set medians, so the
+app runs without the raw DfT CSVs.
+
 ## 📥 Data
 
 The 2023 road safety data is publicly available from the DfT:
@@ -65,6 +79,7 @@ shipped models are trained on the **collision** table only (36 features); set
 * **LightGBM** — optional gradient-boosting backend (`pip install -e ".[lightgbm]"`)
 * **pandas / NumPy** — preprocessing and feature engineering
 * **Matplotlib / Seaborn** — evaluation plots
+* **Streamlit** — interactive dashboard
 * **joblib** — model serialization
 
 ## 📂 Project Structure
@@ -84,6 +99,7 @@ UK_road_safety_modelling/
 ├── notebooks/               # Original exploration notebooks
 ├── models/                  # Trained model pickles (gitignored)
 ├── data/                    # DfT CSV files (gitignored)
+├── app.py                   # Streamlit dashboard
 └── pyproject.toml
 ```
 
@@ -92,10 +108,11 @@ UK_road_safety_modelling/
 ```bash
 git clone https://github.com/ansingh16/UK_road_safety_modelling.git
 cd UK_road_safety_modelling
-pip install -e ".[lightgbm,dev]"
+pip install -e ".[lightgbm,app,dev]"
 ```
 
 * **Regenerate results:** `python scripts/generate_results.py --data-dir data/ --model-dir models/`
+* **Run the dashboard:** `streamlit run app.py`
 * **Run the tests:** `pytest`
 
 The original end-to-end exploration lives in the notebooks:
