@@ -20,8 +20,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import seaborn as sns  # noqa: E402
 from sklearn.metrics import (  # noqa: E402
+    accuracy_score,
     confusion_matrix,
     precision_recall_curve,
+    precision_score,
     recall_score,
 )
 
@@ -140,6 +142,39 @@ def plot_per_class_recall(y_test, severe_pred, balanced_pred, save_path):
     print(f"Saved {save_path}")
 
 
+def write_metrics_table(y_test, severe_pred, balanced_pred, save_path):
+    """Compute headline metrics for both models and write a markdown table."""
+
+    def row_metrics(pred):
+        return {
+            "Severe recall": recall_score(y_test, pred, labels=[1], average=None)[0],
+            "Severe precision": precision_score(
+                y_test, pred, labels=[1], average=None, zero_division=0
+            )[0],
+            "Macro recall": recall_score(y_test, pred, average="macro"),
+            "Overall accuracy": accuracy_score(y_test, pred),
+        }
+
+    sev = row_metrics(severe_pred)
+    bal = row_metrics(balanced_pred)
+
+    lines = [
+        f"Held-out test set: {len(y_test):,} collisions "
+        f"({(y_test == 1).sum():,} severe, {(y_test == 2).sum():,} serious, "
+        f"{(y_test == 3).sum():,} slight).",
+        "",
+        "| Metric | Severe-Optimized (LogReg) | Balanced (RandomForest) |",
+        "|--------|---------------------------|-------------------------|",
+    ]
+    for metric in sev:
+        lines.append(f"| {metric} | {sev[metric]:.3f} | {bal[metric]:.3f} |")
+
+    text = "\n".join(lines) + "\n"
+    Path(save_path).write_text(text)
+    print("\n" + text)
+    print(f"Saved {save_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate evaluation plots")
     parser.add_argument("--data-dir", default="data/", help="Path to DfT CSV directory")
@@ -179,8 +214,9 @@ def main():
     )
     plot_precision_recall(severe_model, X_test, y_test, scaler, output / "precision_recall.png")
     plot_per_class_recall(y_test, severe_pred, balanced_pred, output / "per_class_recall.png")
+    write_metrics_table(y_test, severe_pred, balanced_pred, output / "metrics.md")
 
-    print("\nAll plots saved to", output)
+    print("\nAll results saved to", output)
 
 
 if __name__ == "__main__":

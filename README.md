@@ -1,82 +1,104 @@
-**UK Road Accident Severity Classification - Dual Strategy Approach (2023)**
+# UK Road Accident Severity Classification — Dual-Strategy Approach (2023)
 
 [![CI](https://github.com/ansingh16/UK_road_safety_modelling/actions/workflows/ci.yml/badge.svg)](https://github.com/ansingh16/UK_road_safety_modelling/actions/workflows/ci.yml)
 
-**📌 Project Overview**
-This project leverages the **UK Department for Transport Road Safety Data (2023)** to develop a comprehensive accident severity prediction system with two optimization strategies:
-* **Emergency Response Model** - Achieves 92.4% recall for severe accidents to ensure no critical cases are missed
-* **Traffic Management Model** - Provides balanced classification across all severity levels for resource allocation
-* **Advanced Imbalanced Learning** - Handles extreme class imbalance (severe cases: 1.4% of data) using SMOTE, ADASYN, and custom threshold optimization
+Predicting the severity of UK road collisions from **Department for Transport (DfT)
+2023 road safety data**, using two complementary models tuned for different
+real-world objectives:
 
-The system addresses the critical challenge of **detecting life-threatening accidents** while maintaining practical utility for general traffic management, supporting **data-driven emergency response** and road safety improvements.
+* **Severe-optimized model** (LogisticRegression with heavy class weighting) —
+  catches as many severe/fatal collisions as possible, accepting a high false-alarm
+  rate. Built for triage settings where a missed severe case is far costlier than a
+  false positive.
+* **Balanced model** (RandomForest) — maximises overall accuracy and macro recall
+  across all three severity levels, for general traffic-management and resource
+  planning.
 
-**📊 Data Sources**
-Data for 2023 is publicly available from the **UK Department for Transport**:
-* **Collisions 2023 CSV** - Accident details, location, conditions, timing
-* **Vehicles 2023 CSV** - Vehicle characteristics, maneuvers, damage
-* **Casualties 2023 CSV** - Injury severity, demographics, roles
-* **Dataset Statistics**: 151,852 total accidents (117K slight, 32K serious, 2K severe)
+Severe collisions are only ~1.4% of the data, so the core challenge is **extreme
+class imbalance**, addressed with SMOTE / ADASYN / SMOTE+Tomek resampling, custom
+class weights, and probability-threshold optimization.
 
-**🎯 Key Features**
-* **Dual Model Architecture** - Separate models optimized for different use cases
-* **Imbalanced Learning Techniques** - SMOTE+Tomek, ADASYN, custom class weighting
-* **Probability Calibration** - Improved threshold optimization for false alarm reduction
-* **Business Impact Analysis** - Quantifies trade-offs between recall and precision
-* **Production-Ready Pipeline** - Model saving/loading, comprehensive evaluation metrics
+## 📊 Results
 
-**🛠 Tech Stack**
-* **Python** - Core development and machine learning pipeline
-* **Scikit-learn / Imbalanced-learn** - Classification algorithms and sampling techniques
-* **LightGBM** - Advanced gradient boosting for balanced performance
-* **Pandas / NumPy** - Data preprocessing and feature engineering
-* **Matplotlib / Seaborn** - Model evaluation and performance visualization
-* **Joblib** - Model serialization for production deployment
+Measured on the held-out 20% test split — **20,852 collisions** (304 severe,
+4,688 serious, 15,860 slight). Reproduce with `python scripts/generate_results.py`
+(writes [`results/metrics.md`](results/metrics.md) and the plots below).
 
-KEY INSIGHTS:
+| Metric | Severe-Optimized (LogReg) | Balanced (RandomForest) |
+|--------|---------------------------|-------------------------|
+| Severe recall | **0.977** | 0.868 |
+| Severe precision | 0.033 | **0.120** |
+| Macro recall | 0.619 | **0.809** |
+| Overall accuracy | 0.338 | **0.839** |
 
-   - Severe-optimized model: Perfect for emergency services (don't miss critical cases)
-   - Balanced model: Better for general traffic management and resource planning
-   - SMOTE+Tomek sampling consistently performs well across both strategies
-   - Class imbalance is successfully handled through multiple techniques
+**How to read this:** the severe-optimized model recovers **97.7%** of severe
+collisions — but at very low precision, so it floods the operator with false
+alarms (low overall accuracy). The balanced model is far more accurate overall
+and still recovers **86.8%** of severe cases. The right model depends on the cost
+of a missed severe collision versus the cost of a false alarm.
 
-|Metric              |      Severe-Optimized |  Balanced      |     Difference     
-|--------------------|-----------------------|----------------|---------------------
-|Severe Recall       |      0.997            |   0.868        |       +0.128
-|Severe Precision    |      0.024            |   0.130        |       -0.106
-|Macro Recall        |      0.561            |   0.812        |       -0.251
-|Overall Accuracy    |      0.223            |   0.843        |       -0.620
-|====================|=======================|================|=====================
+### Visuals
 
-**📂 Project Structure**
+| | |
+|---|---|
+| ![Confusion matrices](results/confusion_matrices.png) | ![Per-class recall](results/per_class_recall.png) |
+| ![Precision–recall (severe)](results/precision_recall.png) | ![Feature importance](results/feature_importance.png) |
+
+## 📥 Data
+
+The 2023 road safety data is publicly available from the DfT:
+https://www.data.gov.uk/dataset/cb7ae6f0-4be6-4935-9277-47e5ce24a11f/road-safety-data
+
+Place the collision (and optionally vehicle / casualty) CSVs in `data/`. The
+shipped models are trained on the **collision** table only (36 features); set
+`merge_vehicles=True` in `load_dft_data` to also join the vehicle table.
+
+* **Collisions 2023** — accident details, location, conditions, timing
+* **Vehicles 2023** — vehicle characteristics, manoeuvres, damage
+* **Casualties 2023** — injury severity, demographics, roles
+
+## 🛠 Tech Stack
+
+* **Python** — data pipeline and modelling
+* **scikit-learn** — LogisticRegression, RandomForest, metrics, scaling
+* **imbalanced-learn** — SMOTE, ADASYN, SMOTE+Tomek, RandomUnderSampler
+* **LightGBM** — optional gradient-boosting backend (`pip install -e ".[lightgbm]"`)
+* **pandas / NumPy** — preprocessing and feature engineering
+* **Matplotlib / Seaborn** — evaluation plots
+* **joblib** — model serialization
+
+## 📂 Project Structure
 
 ```
 UK_road_safety_modelling/
-├── notebooks/
-│   ├── Data_Wrangling.ipynb     # Data loading, merging, EDA, feature engineering
-│   ├── Data_Modelling.ipynb     # Model training, evaluation, threshold optimization
-│   ├── UK_accidents.py          # Helper functions for data processing and modeling
-│   └── UK_road_safety.py        # Utility functions
-├── data/                        # DfT CSV files (gitignored)
-├── models/                      # Trained model pickles (gitignored)
-├── requirements.txt
-└── .gitignore
+├── src/uk_road_safety/      # Installable package
+│   ├── data.py              # DfT CSV loading, encoding, imputation, split
+│   ├── models.py            # Sampling strategies + model training
+│   ├── evaluate.py          # Metrics, threshold optimization, plots
+│   └── predict.py           # Load artifacts + predict severity
+├── configs/                 # emergency.yaml / balanced.yaml strategies
+├── scripts/
+│   └── generate_results.py  # Regenerate metrics table + evaluation plots
+├── tests/                   # pytest suite (data / models / evaluate)
+├── results/                 # Generated metrics.md and plots
+├── notebooks/               # Original exploration notebooks
+├── models/                  # Trained model pickles (gitignored)
+├── data/                    # DfT CSV files (gitignored)
+└── pyproject.toml
 ```
 
-**📥 Data**
-
-Download the 2023 road safety data from the UK Department for Transport:
-https://www.data.gov.uk/dataset/cb7ae6f0-4be6-4935-9277-47e5ce24a11f/road-safety-data
-
-Place the three CSV files (collision, vehicle, casualty) in the `data/` directory.
-
-**🚀 How to Run**
+## 🚀 How to Run
 
 ```bash
 git clone https://github.com/ansingh16/UK_road_safety_modelling.git
 cd UK_road_safety_modelling
-pip install -r requirements.txt
+pip install -e ".[lightgbm,dev]"
 ```
 
-Run the notebooks in order:
-1. `notebooks/Data_Wrangling.ipynb` -- loads, merges, and preprocesses the three DfT CSV files
-2. `notebooks/Data_Modelling.ipynb` -- trains both models, runs evaluation, and saves results
+* **Regenerate results:** `python scripts/generate_results.py --data-dir data/ --model-dir models/`
+* **Run the tests:** `pytest`
+
+The original end-to-end exploration lives in the notebooks:
+
+1. `notebooks/Data_Wrangling.ipynb` — loads, merges, and preprocesses the DfT CSVs
+2. `notebooks/Data_Modelling.ipynb` — trains both models, evaluates, saves artifacts
