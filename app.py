@@ -144,7 +144,7 @@ def render_prediction(name, model, scaler, features_df):
 
 def main():
     st.set_page_config(page_title="UK Road Accident Severity", layout="wide")
-    st.title("🚦 UK Road Accident Severity Classifier")
+    st.title("UK Road Accident Severity Classifier")
     st.caption(
         "Set the conditions of a collision and compare predictions from the "
         "severe-optimized and balanced models. Trained on DfT 2023 road safety data."

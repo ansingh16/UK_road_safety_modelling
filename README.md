@@ -18,7 +18,7 @@ Severe collisions are only ~1.4% of the data, so the core challenge is **extreme
 class imbalance**, addressed with SMOTE / ADASYN / SMOTE+Tomek resampling, custom
 class weights, and probability-threshold optimization.
 
-## 📊 Results
+## Results
 
 Measured on the held-out 20% test split — **20,852 collisions** (304 severe,
 4,688 serious, 15,860 slight). Reproduce with `python scripts/generate_results.py`
@@ -31,11 +31,10 @@ Measured on the held-out 20% test split — **20,852 collisions** (304 severe,
 | Macro recall | 0.619 | **0.809** |
 | Overall accuracy | 0.338 | **0.839** |
 
-**How to read this:** the severe-optimized model recovers **97.7%** of severe
-collisions — but at very low precision, so it floods the operator with false
-alarms (low overall accuracy). The balanced model is far more accurate overall
-and still recovers **86.8%** of severe cases. The right model depends on the cost
-of a missed severe collision versus the cost of a false alarm.
+The severe model catches nearly all severe collisions but at very low precision
+(lots of false alarms). The balanced model trades some severe recall for much
+better overall accuracy. Which one you'd use depends on the cost of missing a
+severe case vs. the cost of a false alarm.
 
 ### Visuals
 
@@ -44,7 +43,7 @@ of a missed severe collision versus the cost of a false alarm.
 | ![Confusion matrices](results/confusion_matrices.png) | ![Per-class recall](results/per_class_recall.png) |
 | ![Precision–recall (severe)](results/precision_recall.png) | ![Feature importance](results/feature_importance.png) |
 
-## 🚦 Interactive dashboard
+## Interactive dashboard
 
 A Streamlit app (`app.py`) lets you set the conditions of a collision — speed
 limit, lighting, weather, road surface, junction type, etc. — and compare what
@@ -58,7 +57,7 @@ streamlit run app.py
 The non-interactive features are held at their 2023 training-set medians, so the
 app runs without the raw DfT CSVs.
 
-## 📥 Data
+## Data
 
 The 2023 road safety data is publicly available from the DfT:
 https://www.data.gov.uk/dataset/cb7ae6f0-4be6-4935-9277-47e5ce24a11f/road-safety-data
@@ -71,7 +70,7 @@ shipped models are trained on the **collision** table only (36 features); set
 * **Vehicles 2023** — vehicle characteristics, manoeuvres, damage
 * **Casualties 2023** — injury severity, demographics, roles
 
-## 🛠 Tech Stack
+## Tech stack
 
 * **Python** — data pipeline and modelling
 * **scikit-learn** — LogisticRegression, RandomForest, metrics, scaling
@@ -82,7 +81,7 @@ shipped models are trained on the **collision** table only (36 features); set
 * **Streamlit** — interactive dashboard
 * **joblib** — model serialization
 
-## 📂 Project Structure
+## Project structure
 
 ```
 UK_road_safety_modelling/
@@ -103,7 +102,7 @@ UK_road_safety_modelling/
 └── pyproject.toml
 ```
 
-## 🚀 How to Run
+## How to run
 
 ```bash
 git clone https://github.com/ansingh16/UK_road_safety_modelling.git
