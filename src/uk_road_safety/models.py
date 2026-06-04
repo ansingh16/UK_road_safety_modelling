@@ -21,6 +21,60 @@ except ImportError:
     LIGHTGBM_AVAILABLE = False
 
 
+def train_best_models(X_train, y_train, X_test, y_test):
+    """Train the production severe + balanced models directly.
+
+    Uses LightGBM when available, falls back to LogReg/RF. No SMOTE
+    needed — LightGBM handles imbalance via class_weight.
+
+    Returns dict with keys: severe_model, balanced_model, results_df.
+    """
+    results = []
+
+    if LIGHTGBM_AVAILABLE:
+        severe = lgb.LGBMClassifier(
+            objective="multiclass", num_class=3,
+            class_weight={1: 50, 2: 3, 3: 1},
+            n_estimators=500, max_depth=8, learning_rate=0.03,
+            num_leaves=63, min_child_samples=30,
+            random_state=42, verbosity=-1,
+            subsample=0.8, colsample_bytree=0.8,
+        )
+        balanced = lgb.LGBMClassifier(
+            objective="multiclass", num_class=3,
+            class_weight="balanced",
+            n_estimators=500, max_depth=8, learning_rate=0.03,
+            num_leaves=63, min_child_samples=30,
+            random_state=42, verbosity=-1,
+            subsample=0.8, colsample_bytree=0.8,
+        )
+    else:
+        severe = LogisticRegression(
+            class_weight={1: 50, 2: 5, 3: 1}, random_state=42, max_iter=1000,
+        )
+        balanced = RandomForestClassifier(
+            n_estimators=200, max_depth=15, class_weight="balanced",
+            random_state=42, n_jobs=-1,
+        )
+
+    for name, model in [("severe", severe), ("balanced", balanced)]:
+        model.fit(X_train, y_train)
+        pred = model.predict(X_test)
+        results.append({
+            "Model": name,
+            "Algorithm": type(model).__name__,
+            "Severe_Recall": recall_score(y_test, pred, labels=[1], average=None)[0],
+            "Macro_Recall": recall_score(y_test, pred, average="macro"),
+            "Accuracy": accuracy_score(y_test, pred),
+        })
+
+    return {
+        "severe_model": severe,
+        "balanced_model": balanced,
+        "results_df": pd.DataFrame(results),
+    }
+
+
 def get_sampling_techniques(X_train, y_train):
     """Apply SMOTE, ADASYN, SMOTE+Tomek, and random undersampling.
 
