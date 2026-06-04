@@ -66,7 +66,6 @@ FEATURE_BASELINE = {
     "did_police_officer_attend_scene_of_accident": 1.0,
     "trunk_road_flag": 2.0,
     "lsoa_of_accident_location": 12321.0,
-    "enhanced_severity_collision": 3.0,
 }
 
 # DfT code lookups for the interpretable features the UI exposes.
@@ -163,13 +162,13 @@ def main():
 data, so no single model handles them well. This tool runs two complementary
 classifiers side-by-side:
 
-- **Severe-optimized** (Logistic Regression) — tuned to catch nearly all
-  severe/fatal cases (97.7% recall), at the cost of many false alarms (3.3%
-  precision, 33.8% accuracy). Use this when missing a severe case is the
-  bigger risk.
-- **Balanced** (Random Forest) — tuned for overall accuracy (83.9%) across all
-  three classes. Better precision on severe cases (12.0%) but misses more of
-  them (86.8% recall).
+- **Severe-optimized** (Logistic Regression + ADASYN oversampling) — tuned to
+  catch nearly all severe/fatal cases (98.0% recall), at the cost of many
+  false alarms (2.2% precision, 19.6% accuracy). Use this when missing a
+  severe case is the bigger risk.
+- **Balanced** (Random Forest + undersampling) — tuned for overall accuracy
+  (55.0%) and macro recall (52.7%) across all three classes. Catches about
+  half of severe cases (52.6% recall).
 
 **Severity classes** follow the DfT definitions: *Severe / Fatal* = at least
 one fatality or life-threatening injury; *Serious* = hospital admission or
@@ -254,14 +253,14 @@ median values.
     with col1:
         sev_label = render_prediction(
             "Severe-optimized model", severe_model, scaler, features_df,
-            description="Logistic Regression — tuned to flag nearly all severe cases.",
-            key_metric="97.7% severe recall · 33.8% overall accuracy",
+            description="Logistic Regression + ADASYN — tuned to flag nearly all severe cases.",
+            key_metric="98.0% severe recall · 19.6% overall accuracy",
         )
     with col2:
         bal_label = render_prediction(
             "Balanced model", balanced_model, None, features_df,
-            description="Random Forest — tuned for overall accuracy across all classes.",
-            key_metric="86.8% severe recall · 83.9% overall accuracy",
+            description="Random Forest + undersampling — tuned for overall accuracy.",
+            key_metric="52.7% macro recall · 55.0% overall accuracy",
         )
 
     if sev_label != bal_label:

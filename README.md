@@ -26,15 +26,17 @@ Measured on the held-out 20% test split — **20,852 collisions** (304 severe,
 
 | Metric | Severe-Optimized (LogReg) | Balanced (RandomForest) |
 |--------|---------------------------|-------------------------|
-| Severe recall | **0.977** | 0.868 |
-| Severe precision | 0.033 | **0.120** |
-| Macro recall | 0.619 | **0.809** |
-| Overall accuracy | 0.338 | **0.839** |
+| Severe recall | **0.980** | 0.526 |
+| Severe precision | 0.022 | **0.054** |
+| Macro recall | 0.440 | **0.527** |
+| Overall accuracy | 0.196 | **0.550** |
 
-The severe model catches nearly all severe collisions but at very low precision
-(lots of false alarms). The balanced model trades some severe recall for much
-better overall accuracy. Which one you'd use depends on the cost of missing a
-severe case vs. the cost of a false alarm.
+The severe model catches nearly all severe collisions (98%) but at very low
+precision — almost everything gets flagged. The balanced model has much better
+overall accuracy but catches only about half the severe cases. Predicting
+severity from scene-level features alone (road conditions, time, location) is
+genuinely difficult; the models show the fundamental tradeoff between catching
+rare severe cases and overall accuracy.
 
 ### Visuals
 

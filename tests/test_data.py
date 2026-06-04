@@ -50,3 +50,10 @@ def test_preprocess_imputes_missing_values(sample_frame):
 def test_target_excluded_from_features(sample_frame):
     prep = preprocess_features(sample_frame, target_col="accident_severity")
     assert "accident_severity" not in prep["feature_names"]
+
+
+def test_leaky_columns_excluded(sample_frame):
+    frame = sample_frame.copy()
+    frame["enhanced_severity_collision"] = np.random.default_rng(0).integers(1, 8, len(frame))
+    prep = preprocess_features(frame, target_col="accident_severity")
+    assert "enhanced_severity_collision" not in prep["feature_names"]

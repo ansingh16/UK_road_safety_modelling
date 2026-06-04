@@ -59,7 +59,9 @@ def preprocess_features(
 
     Returns (X_train, X_test, y_train, y_test, scaler, label_encoders, feature_names).
     """
-    X = df.drop(columns=[target_col])
+    # enhanced_severity_collision is derived from the target — drop to avoid leakage
+    leak_cols = [c for c in ["enhanced_severity_collision"] if c in df.columns]
+    X = df.drop(columns=[target_col] + leak_cols)
     y = df[target_col]
 
     numerical_cols = X.select_dtypes(include=[np.number]).columns
