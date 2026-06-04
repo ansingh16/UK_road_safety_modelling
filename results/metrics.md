@@ -1,8 +1,8 @@
 Held-out test set: 20,852 collisions (304 severe, 4,688 serious, 15,860 slight).
 
-| Metric | Severe-Optimized (LogReg) | Balanced (RandomForest) |
+| Metric | Severe-Optimized (LGBMClassifier) | Balanced (LGBMClassifier) |
 |--------|---------------------------|-------------------------|
-| Severe recall | 0.980 | 0.526 |
-| Severe precision | 0.022 | 0.054 |
-| Macro recall | 0.440 | 0.527 |
-| Overall accuracy | 0.196 | 0.550 |
+| Severe recall | 0.342 | 0.316 |
+| Severe precision | 0.084 | 0.082 |
+| Macro recall | 0.527 | 0.520 |
+| Overall accuracy | 0.668 | 0.647 |

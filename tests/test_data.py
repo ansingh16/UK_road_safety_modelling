@@ -32,8 +32,9 @@ def test_preprocess_encodes_categoricals(sample_frame):
 
     # categorical columns must be present in the encoder map and now numeric
     assert "road_type" in prep["label_encoders"]
-    assert "date" in prep["label_encoders"]
     assert np.issubdtype(prep["X_train"]["road_type"].dtype, np.integer)
+    # date is consumed into month by engineer_features, so no longer categorical
+    assert "month" in prep["feature_names"]
 
 
 def test_preprocess_imputes_missing_values(sample_frame):

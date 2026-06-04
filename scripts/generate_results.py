@@ -142,7 +142,9 @@ def plot_per_class_recall(y_test, severe_pred, balanced_pred, save_path):
     print(f"Saved {save_path}")
 
 
-def write_metrics_table(y_test, severe_pred, balanced_pred, save_path):
+def write_metrics_table(
+    y_test, severe_pred, balanced_pred, save_path, severe_model=None, balanced_model=None
+):
     """Compute headline metrics for both models and write a markdown table."""
 
     def row_metrics(pred):
@@ -158,12 +160,15 @@ def write_metrics_table(y_test, severe_pred, balanced_pred, save_path):
     sev = row_metrics(severe_pred)
     bal = row_metrics(balanced_pred)
 
+    sev_name = type(severe_model).__name__ if severe_model else "Severe-Optimized"
+    bal_name = type(balanced_model).__name__ if balanced_model else "Balanced"
+
     lines = [
         f"Held-out test set: {len(y_test):,} collisions "
         f"({(y_test == 1).sum():,} severe, {(y_test == 2).sum():,} serious, "
         f"{(y_test == 3).sum():,} slight).",
         "",
-        "| Metric | Severe-Optimized (LogReg) | Balanced (RandomForest) |",
+        f"| Metric | Severe-Optimized ({sev_name}) | Balanced ({bal_name}) |",
         "|--------|---------------------------|-------------------------|",
     ]
     for metric in sev:
@@ -193,7 +198,7 @@ def main():
     scaler = joblib.load(model_dir / "accident_severity_model_scaler.pkl")
 
     print("Loading and preprocessing data...")
-    df = load_dft_data(args.data_dir, years=[2023], merge_vehicles=False)
+    df = load_dft_data(args.data_dir, years=[2023], merge_vehicles=True)
     prep = preprocess_features(df, target_col="accident_severity")
     X_test = prep["X_test"]
     y_test = prep["y_test"]
@@ -214,7 +219,10 @@ def main():
     )
     plot_precision_recall(severe_model, X_test, y_test, scaler, output / "precision_recall.png")
     plot_per_class_recall(y_test, severe_pred, balanced_pred, output / "per_class_recall.png")
-    write_metrics_table(y_test, severe_pred, balanced_pred, output / "metrics.md")
+    write_metrics_table(
+        y_test, severe_pred, balanced_pred, output / "metrics.md",
+        severe_model=severe_model, balanced_model=balanced_model,
+    )
 
     print("\nAll results saved to", output)
 

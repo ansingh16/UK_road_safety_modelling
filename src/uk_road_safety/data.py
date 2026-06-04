@@ -92,7 +92,10 @@ def engineer_features(df):
     if "day_of_week" in out.columns:
         out["is_weekend"] = out["day_of_week"].isin([1, 7]).astype(int)
     if "date" in out.columns:
-        out["month"] = pd.to_datetime(out["date"], format="%d/%m/%Y", errors="coerce").dt.month
+        parsed = pd.to_datetime(out["date"], format="%d/%m/%Y", errors="coerce")
+        if parsed.isna().all():
+            parsed = pd.to_datetime(out["date"], errors="coerce")
+        out["month"] = parsed.dt.month
     if "latitude" in out.columns and "longitude" in out.columns:
         out["lat_grid"] = (out["latitude"] * 10).round()
         out["lon_grid"] = (out["longitude"] * 10).round()
