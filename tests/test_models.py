@@ -1,7 +1,7 @@
 import pandas as pd
 
 from uk_road_safety.data import preprocess_features
-from uk_road_safety.models import _get_model_configs, train_models
+from uk_road_safety.models import _get_model_configs, train_best_models, train_models
 
 
 def test_model_configs_contain_both_strategies():
@@ -63,3 +63,14 @@ def test_train_models_metrics_in_valid_range(sample_frame):
 
     for col in ["Recall_Severe", "Recall_Macro", "Accuracy"]:
         assert results[col].between(0.0, 1.0).all()
+
+
+def test_train_best_models_returns_both(sample_frame):
+    prep = preprocess_features(sample_frame, target_col="accident_severity")
+    best = train_best_models(
+        prep["X_train"], prep["y_train"], prep["X_test"], prep["y_test"],
+    )
+    assert best["severe_model"] is not None
+    assert best["balanced_model"] is not None
+    assert len(best["results_df"]) == 2
+    assert set(best["results_df"]["Model"]) == {"severe", "balanced"}
