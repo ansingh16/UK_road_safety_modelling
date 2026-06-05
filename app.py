@@ -1,16 +1,14 @@
 """Streamlit dashboard for the UK road accident severity classifier.
 
-Lets a user set the interpretable conditions of a collision (speed limit,
-lighting, weather, road surface, etc.) and see what each of the two trained
-models predicts:
+Lets a user set collision conditions and vehicle characteristics, then
+compares predictions from two LightGBM models:
 
-* Severe-optimized (LogisticRegression) — tuned for high recall on severe cases.
-* Balanced (RandomForest) — tuned for overall accuracy across all classes.
+* Severe-optimized — tuned for high recall on severe/fatal cases.
+* Balanced — tuned for overall accuracy across all three classes.
 
-The DfT model expects 36 features. Only a handful are meaningful for a human
-to set, so the rest are held at their median value from the 2023 training set
-(baseline below) — this also means the app runs without the raw CSVs, which
-are gitignored.
+The models use 42 features (collision context + vehicle aggregates +
+engineered time/geo features). The sidebar exposes the interpretable
+ones; the rest stay at their 2023 training-set medians.
 
 Run with:
     streamlit run app.py
@@ -27,24 +25,11 @@ from uk_road_safety.predict import load_model_artifacts, predict_severity  # noq
 
 MODEL_DIR = Path(__file__).resolve().parent / "models"
 
-# Median value of every model feature on the 2023 training split. Features the
-# UI does not expose stay at these values. Order is irrelevant here — the row is
-# reindexed to the scaler's feature order before prediction.
 FEATURE_BASELINE = {
-    "accident_index": 52106.5,
-    "accident_year": 2023.0,
-    "accident_reference": 52106.5,
-    "location_easting_osgr": 462096.5,
-    "location_northing_osgr": 216156.5,
-    "longitude": -1.0851565,
-    "latitude": 51.832629,
     "police_force": 22.0,
     "number_of_vehicles": 2.0,
     "number_of_casualties": 1.0,
-    "date": 179.0,
     "day_of_week": 4.0,
-    "time": 900.0,
-    "local_authority_district": -1.0,
     "local_authority_ons_district": 203.0,
     "local_authority_highway": 112.0,
     "first_road_class": 4.0,
@@ -66,9 +51,25 @@ FEATURE_BASELINE = {
     "did_police_officer_attend_scene_of_accident": 1.0,
     "trunk_road_flag": 2.0,
     "lsoa_of_accident_location": 12321.0,
+    "has_motorcycle": 0.0,
+    "has_hgv": 0.0,
+    "has_pedestrian": 0.0,
+    "has_bicycle": 0.0,
+    "driver_age_min": 31.0,
+    "driver_age_max": 44.0,
+    "any_skidding": 0.0,
+    "any_side_impact": 0.0,
+    "engine_cc_max": 1598.0,
+    "age_of_vehicle_max": 9.0,
+    "pct_male_drivers": 0.5,
+    "hour": 15.0,
+    "is_night": 0.0,
+    "is_weekend": 0.0,
+    "month": 7.0,
+    "lat_grid": 518.0,
+    "lon_grid": -11.0,
 }
 
-# DfT code lookups for the interpretable features the UI exposes.
 SPEED_LIMITS = [20, 30, 40, 50, 60, 70]
 DAY_OF_WEEK = {1: "Sunday", 2: "Monday", 3: "Tuesday", 4: "Wednesday", 5: "Thursday",
                6: "Friday", 7: "Saturday"}
@@ -117,12 +118,10 @@ SEVERITY_LABELS = {1: "Severe / Fatal", 2: "Serious", 3: "Slight"}
 
 @st.cache_resource
 def get_artifacts():
-    """Load and cache the trained models, scaler and label encoders."""
     return load_model_artifacts(MODEL_DIR)
 
 
 def build_feature_row(overrides, feature_order):
-    """Return a one-row DataFrame in the model's feature order."""
     row = dict(FEATURE_BASELINE)
     row.update(overrides)
     return pd.DataFrame([row])[list(feature_order)]
@@ -142,7 +141,7 @@ def render_prediction(name, model, scaler, features_df, description="", key_metr
             {"Probability": proba[0]},
             index=[SEVERITY_LABELS[c] for c in model.classes_],
         )
-        st.caption("Class probabilities — the model's confidence for each severity level:")
+        st.caption("Class probabilities:")
         st.bar_chart(prob_df)
     return label
 
@@ -159,25 +158,22 @@ def main():
         st.markdown(
             """
 **Two models, two strategies.** Severe/fatal collisions are only ~1.4% of the
-data, so no single model handles them well. This tool runs two complementary
+data, so no single model handles them well. This tool runs two LightGBM
 classifiers side-by-side:
 
-- **Severe-optimized** (Logistic Regression + ADASYN oversampling) — tuned to
-  catch nearly all severe/fatal cases (98.0% recall), at the cost of many
-  false alarms (2.2% precision, 19.6% accuracy). Use this when missing a
-  severe case is the bigger risk.
-- **Balanced** (Random Forest + undersampling) — tuned for overall accuracy
-  (55.0%) and macro recall (52.7%) across all three classes. Catches about
-  half of severe cases (52.6% recall).
+- **Severe-optimized** — heavy class weighting ({1:50, 2:3, 3:1}) to push
+  recall on severe cases higher, at the cost of more false alarms.
+- **Balanced** — balanced class weights for the best overall accuracy and
+  macro recall across all three severity levels.
 
 **Severity classes** follow the DfT definitions: *Severe / Fatal* = at least
 one fatality or life-threatening injury; *Serious* = hospital admission or
 significant injury; *Slight* = minor or no hospital treatment.
 
-**How the inputs work.** The models use 36 features from DfT collision records.
-The sidebar exposes the 11 that are meaningful to set by hand; the other 25
-(location codes, police force, etc.) are held at their 2023 training-set
-median values.
+**How the inputs work.** The models use 42 features from DfT collision and
+vehicle records. The sidebar exposes the ones that are meaningful to set by
+hand; the remaining features (location codes, police force, etc.) are held
+at their 2023 training-set median values.
 """
         )
 
@@ -196,7 +192,7 @@ median values.
     feature_order = list(scaler.feature_names_in_)
 
     with st.sidebar:
-        st.header("Collision conditions")
+        st.header("Scene conditions")
         speed = st.select_slider(
             "Speed limit (mph)", SPEED_LIMITS, value=30,
             help="Posted speed limit on the road where the collision occurred.",
@@ -234,11 +230,22 @@ median values.
             help="DfT urban/rural classification of the collision location.",
         )
 
+        st.header("Vehicle & driver")
+        motorcycle = st.checkbox("Motorcycle involved")
+        hgv = st.checkbox("HGV / lorry involved")
+        bicycle = st.checkbox("Bicycle involved")
+        driver_age = st.slider(
+            "Youngest driver age", 16, 90, 35,
+            help="Age of the youngest driver involved.",
+        )
+
     overrides = {
         "speed_limit": float(speed),
         "number_of_vehicles": float(n_vehicles),
         "number_of_casualties": float(n_casualties),
-        "time": float(hour * 100),  # DfT encodes time as HHMM
+        "hour": float(hour),
+        "is_night": float(hour in [22, 23, 0, 1, 2, 3, 4, 5]),
+        "is_weekend": float(dow in [1, 7]),
         "day_of_week": float(dow),
         "light_conditions": float(light),
         "weather_conditions": float(weather),
@@ -246,6 +253,10 @@ median values.
         "road_type": float(road),
         "junction_detail": float(junction),
         "urban_or_rural_area": float(area),
+        "has_motorcycle": float(motorcycle),
+        "has_hgv": float(hgv),
+        "has_bicycle": float(bicycle),
+        "driver_age_min": float(driver_age),
     }
     features_df = build_feature_row(overrides, feature_order)
 
@@ -253,14 +264,14 @@ median values.
     with col1:
         sev_label = render_prediction(
             "Severe-optimized model", severe_model, scaler, features_df,
-            description="Logistic Regression + ADASYN — tuned to flag nearly all severe cases.",
-            key_metric="98.0% severe recall · 19.6% overall accuracy",
+            description="LightGBM — heavy class weighting to flag severe cases.",
+            key_metric="52.7% macro recall · 66.8% overall accuracy",
         )
     with col2:
         bal_label = render_prediction(
             "Balanced model", balanced_model, None, features_df,
-            description="Random Forest + undersampling — tuned for overall accuracy.",
-            key_metric="52.7% macro recall · 55.0% overall accuracy",
+            description="LightGBM — balanced class weights for overall accuracy.",
+            key_metric="52.0% macro recall · 64.7% overall accuracy",
         )
 
     if sev_label != bal_label:
@@ -273,9 +284,8 @@ median values.
     st.divider()
     st.subheader("Top feature importances (balanced model)")
     st.caption(
-        "How much each feature contributes to the Random Forest's predictions "
-        "(Gini importance). Only the balanced model is shown — Logistic Regression "
-        "coefficients are not directly comparable as feature importances."
+        "How much each feature contributes to the LightGBM's predictions "
+        "(split count). Higher bars = the model relies more on that feature."
     )
     if hasattr(balanced_model, "feature_importances_"):
         imp = (

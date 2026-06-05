@@ -3,20 +3,18 @@
 [![CI](https://github.com/ansingh16/UK_road_safety_modelling/actions/workflows/ci.yml/badge.svg)](https://github.com/ansingh16/UK_road_safety_modelling/actions/workflows/ci.yml)
 
 Predicting the severity of UK road collisions from **Department for Transport (DfT)
-2023 road safety data**, using two complementary models tuned for different
-real-world objectives:
+2023 road safety data** (104K collisions + 190K vehicle records), using two
+LightGBM classifiers tuned for different real-world objectives:
 
-* **Severe-optimized model** (LogisticRegression with heavy class weighting) —
-  catches as many severe/fatal collisions as possible, accepting a high false-alarm
-  rate. Built for triage settings where a missed severe case is far costlier than a
-  false positive.
-* **Balanced model** (RandomForest) — maximises overall accuracy and macro recall
-  across all three severity levels, for general traffic-management and resource
-  planning.
+* **Severe-optimized** — heavy class weighting ({1:50, 2:3, 3:1}) to push
+  recall on severe/fatal cases higher, for triage settings where a missed
+  severe case is far costlier than a false alarm.
+* **Balanced** — balanced class weights for overall accuracy across all three
+  severity levels, for general traffic-management and resource planning.
 
-Severe collisions are only ~1.4% of the data, so the core challenge is **extreme
-class imbalance**, addressed with SMOTE / ADASYN / SMOTE+Tomek resampling, custom
-class weights, and probability-threshold optimization.
+Severe collisions are only ~1.4% of the data. The models combine collision
+context (road, weather, time, location) with vehicle-level aggregates
+(motorcycle/HGV involvement, driver age, engine capacity) — 42 features total.
 
 ## Results
 
@@ -24,19 +22,19 @@ Measured on the held-out 20% test split — **20,852 collisions** (304 severe,
 4,688 serious, 15,860 slight). Reproduce with `python scripts/generate_results.py`
 (writes [`results/metrics.md`](results/metrics.md) and the plots below).
 
-| Metric | Severe-Optimized (LogReg) | Balanced (RandomForest) |
+| Metric | Severe-Optimized (LightGBM) | Balanced (LightGBM) |
 |--------|---------------------------|-------------------------|
-| Severe recall | **0.980** | 0.526 |
-| Severe precision | 0.022 | **0.054** |
-| Macro recall | 0.440 | **0.527** |
-| Overall accuracy | 0.196 | **0.550** |
+| Severe recall | **0.342** | 0.316 |
+| Severe precision | 0.084 | **0.082** |
+| Macro recall | **0.527** | 0.520 |
+| Overall accuracy | 0.668 | **0.647** |
 
-The severe model catches nearly all severe collisions (98%) but at very low
-precision — almost everything gets flagged. The balanced model has much better
-overall accuracy but catches only about half the severe cases. Predicting
-severity from scene-level features alone (road conditions, time, location) is
-genuinely difficult; the models show the fundamental tradeoff between catching
-rare severe cases and overall accuracy.
+Predicting collision severity from pre-crash data is genuinely hard — the
+strongest individual features (driver age, engine capacity, hour of day) have
+mutual information under 0.02 with the target. See
+[`notebooks/03_Feature_Analysis.ipynb`](notebooks/03_Feature_Analysis.ipynb)
+for the full analysis: MI ranking, vehicle data exploration, and threshold
+optimization curves.
 
 ### Visuals
 
@@ -68,9 +66,9 @@ app runs without the raw DfT CSVs.
 The 2023 road safety data is publicly available from the DfT:
 https://www.data.gov.uk/dataset/cb7ae6f0-4be6-4935-9277-47e5ce24a11f/road-safety-data
 
-Place the collision (and optionally vehicle / casualty) CSVs in `data/`. The
-shipped models are trained on the **collision** table only (36 features); set
-`merge_vehicles=True` in `load_dft_data` to also join the vehicle table.
+Place the collision and vehicle CSVs in `data/`. The shipped models are
+trained on both tables merged (42 features after vehicle aggregation and
+feature engineering).
 
 * **Collisions 2023** — accident details, location, conditions, timing
 * **Vehicles 2023** — vehicle characteristics, manoeuvres, damage
@@ -79,9 +77,9 @@ shipped models are trained on the **collision** table only (36 features); set
 ## Tech stack
 
 * **Python** — data pipeline and modelling
-* **scikit-learn** — LogisticRegression, RandomForest, metrics, scaling
-* **imbalanced-learn** — SMOTE, ADASYN, SMOTE+Tomek, RandomUnderSampler
-* **LightGBM** — optional gradient-boosting backend (`pip install -e ".[lightgbm]"`)
+* **LightGBM** — gradient-boosted classifiers (both models)
+* **scikit-learn** — scaling, metrics, train/test split
+* **imbalanced-learn** — SMOTE, ADASYN, SMOTE+Tomek (experimental, not used in shipped models)
 * **pandas / NumPy** — preprocessing and feature engineering
 * **Matplotlib / Seaborn** — evaluation plots
 * **Streamlit** — interactive dashboard
@@ -92,8 +90,8 @@ shipped models are trained on the **collision** table only (36 features); set
 ```
 UK_road_safety_modelling/
 ├── src/uk_road_safety/      # Installable package
-│   ├── data.py              # DfT CSV loading, encoding, imputation, split
-│   ├── models.py            # Sampling strategies + model training
+│   ├── data.py              # DfT CSV loading, vehicle aggregation, feature engineering
+│   ├── models.py            # LightGBM training + sampling strategies
 │   ├── evaluate.py          # Metrics, threshold optimization, plots
 │   └── predict.py           # Load artifacts + predict severity
 ├── configs/                 # emergency.yaml / balanced.yaml strategies
@@ -102,7 +100,7 @@ UK_road_safety_modelling/
 ├── tests/                   # pytest suite (data / models / evaluate)
 ├── results/                 # Generated metrics.md and plots
 ├── notebooks/               # Original exploration notebooks
-├── models/                  # Trained model pickles (gitignored)
+├── models/                  # Trained model pickles
 ├── data/                    # DfT CSV files (gitignored)
 ├── app.py                   # Streamlit dashboard
 └── pyproject.toml
@@ -120,7 +118,8 @@ pip install -e ".[lightgbm,app,dev]"
 * **Run the dashboard:** `streamlit run app.py`
 * **Run the tests:** `pytest`
 
-The original end-to-end exploration lives in the notebooks:
+The exploration notebooks document the analysis journey:
 
 1. `notebooks/Data_Wrangling.ipynb` — loads, merges, and preprocesses the DfT CSVs
 2. `notebooks/Data_Modelling.ipynb` — trains both models, evaluates, saves artifacts
+3. `notebooks/03_Feature_Analysis.ipynb` — MI analysis, vehicle data exploration, LightGBM comparison
