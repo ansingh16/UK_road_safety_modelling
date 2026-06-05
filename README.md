@@ -36,6 +36,22 @@ mutual information under 0.02 with the target. See
 for the full analysis: MI ranking, vehicle data exploration, and threshold
 optimization curves.
 
+### How this compares to published work
+
+Predicting severity from pre-crash scene features is a known hard problem.
+Published studies on the same DfT STATS19 dataset report similar results:
+
+| Study | Data | Task | Key metric |
+|-------|------|------|------------|
+| [Le, 2026](https://doi.org/10.1371/journal.pone.0347873) (PLOS ONE) | STATS19 2020–2024, 503K records | 2-class KSI | KSI recall 0.605 at optimized threshold, ROC-AUC 0.664 |
+| [Lagias et al., 2022](https://doi.org/10.1007/978-3-031-08223-8_34) (Springer EANN) | STATS19, ~50% missing data | 3-class benchmark | Modest ANN/RL baselines; positioned as a hard benchmark |
+| [Obasi & Benson, 2023](https://doi.org/10.1016/j.heliyon.2023.e18812) (Heliyon) | STATS19 2005–2014, 2M records | 3-class | 87% overall accuracy (dominated by ~80% Slight majority) |
+| **This project** | STATS19 2023, 104K records | 3-class | 0.527 macro recall, 0.668 accuracy (severe-optimized) |
+
+No study achieves strong 3-class performance from pre-crash features alone.
+The factors that determine injury outcome (seatbelt use, exact impact angle,
+occupant frailty, vehicle safety rating) are not in the DfT collision table.
+
 ### Visuals
 
 | | |
